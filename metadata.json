@@ -1,0 +1,6 @@
+{
+  "name": "スマートダッシュボード",
+  "description": "滋賀県近江八幡市の天気、カレンダー、日本のニュース、今日の検索トレンド、今日は何の日が見れるスマートディスプレイ型ダッシュボードアプリです。",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
