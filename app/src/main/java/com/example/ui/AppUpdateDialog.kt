@@ -1,6 +1,5 @@
 package com.example.ui
 
-import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -10,7 +9,13 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.OpenInBrowser
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -19,16 +24,18 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ThemePalette
 import com.example.data.AppReleaseNote
 import com.example.data.AppUpdateState
 import com.example.data.UpdateCheckStatus
+import java.util.Locale
 
 /**
  * App Update & Software Maintenance Dialog.
- * Provides update checking, downloading animation, release notes, and auto-update configurations.
+ * Direct integration with GitHub Releases to download and install APKs.
  */
 @Composable
 fun AppUpdateDialog(
@@ -36,11 +43,13 @@ fun AppUpdateDialog(
     palette: ThemePalette,
     onCheckForUpdates: () -> Unit,
     onStartDownloadAndInstall: () -> Unit,
-    onToggleSimulatedUpdate: () -> Unit,
+    onTriggerInstallApk: () -> Unit,
+    onOpenGitHubReleases: () -> Unit,
     onSetAutoCheckUpdates: (Boolean) -> Unit,
     onOpenPlayStore: () -> Unit,
     onDismiss: () -> Unit
 ) {
+
     // Completely opaque backdrop
     Box(
         modifier = Modifier
@@ -53,8 +62,8 @@ fun AppUpdateDialog(
             shape = RoundedCornerShape(24.dp),
             colors = CardDefaults.cardColors(containerColor = palette.containerColor),
             modifier = Modifier
-                .width(540.dp)
-                .heightIn(max = 620.dp)
+                .width(560.dp)
+                .heightIn(max = 640.dp)
                 .border(1.5.dp, palette.cardBorderColor, RoundedCornerShape(24.dp))
                 .clickable(enabled = false) { /* Prevent click propagation */ }
                 .padding(16.dp),
@@ -80,7 +89,7 @@ fun AppUpdateDialog(
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(38.dp)
+                                .size(40.dp)
                                 .background(palette.buttonColor, CircleShape)
                                 .border(1.dp, palette.cardBorderColor, CircleShape),
                             contentAlignment = Alignment.Center
@@ -89,7 +98,7 @@ fun AppUpdateDialog(
                                 imageVector = Icons.Default.Refresh,
                                 contentDescription = "Update",
                                 tint = palette.accentColor,
-                                modifier = Modifier.size(20.dp)
+                                modifier = Modifier.size(22.dp)
                             )
                         }
                         Column {
@@ -100,7 +109,7 @@ fun AppUpdateDialog(
                                 color = palette.textColor
                             )
                             Text(
-                                text = "現在のバージョン: v${updateState.currentVersion}",
+                                text = "現在の端末バージョン: v${updateState.currentVersion}",
                                 fontSize = 11.sp,
                                 color = palette.secondaryTextColor
                             )
@@ -121,13 +130,89 @@ fun AppUpdateDialog(
 
                 HorizontalDivider(color = palette.cardBorderColor)
 
-                // Current Status Card
+                // GitHub Repository Source Bar
+                // Repository Info Card
+                Card(
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = palette.buttonColor),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, palette.cardBorderColor),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 14.dp, vertical = 12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(4.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Surface(
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = Color(0xFF24292E),
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF444D56))
+                                ) {
+                                    Text(
+                                        text = "GitHub Releases",
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.White,
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                    )
+                                }
+                                Text(
+                                    text = "配信元リポジトリ",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = palette.textColor
+                                )
+                            }
+                            Text(
+                                text = "github.com/${updateState.githubRepo}",
+                                fontSize = 11.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = palette.accentColor,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+
+                        OutlinedButton(
+                            onClick = onOpenGitHubReleases,
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, palette.cardBorderColor)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.OpenInBrowser,
+                                contentDescription = "GitHubを開く",
+                                tint = palette.textColor,
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "GitHubを開く",
+                                fontSize = 11.sp,
+                                color = palette.textColor
+                            )
+                        }
+                    }
+                }
+
+                // Current Status Card & GitHub APK Download Controls
                 UpdateStatusSection(
                     updateState = updateState,
                     palette = palette,
                     onCheckForUpdates = onCheckForUpdates,
                     onStartDownloadAndInstall = onStartDownloadAndInstall,
-                    onToggleSimulatedUpdate = onToggleSimulatedUpdate,
+                    onTriggerInstallApk = onTriggerInstallApk,
+                    onOpenGitHubReleases = onOpenGitHubReleases,
                     onOpenPlayStore = onOpenPlayStore,
                     onDismiss = onDismiss
                 )
@@ -140,15 +225,47 @@ fun AppUpdateDialog(
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                     horizontalAlignment = Alignment.Start
                 ) {
-                    Text(
-                        text = "■ 更新内容・リリースノート",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = palette.accentColor
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "■ 更新内容・リリースノート",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = palette.accentColor
+                        )
+                        if (updateState.releaseTitle.isNotBlank()) {
+                            Text(
+                                text = updateState.releaseTitle,
+                                fontSize = 10.sp,
+                                color = palette.secondaryTextColor,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
 
-                    updateState.releaseNotes.forEach { note ->
-                        ReleaseNoteCard(note = note, palette = palette)
+                    if (updateState.releaseNotes.isNotEmpty()) {
+                        updateState.releaseNotes.forEach { note ->
+                            ReleaseNoteCard(note = note, palette = palette)
+                        }
+                    } else {
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = palette.buttonColor,
+                            border = androidx.compose.foundation.BorderStroke(1.dp, palette.cardBorderColor),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = if (updateState.status == UpdateCheckStatus.CHECKING) "リリースノートを確認中..."
+                                else "リリースノートはありません。「GitHubで再確認」を押すと最新のリリースノートを取得します。",
+                                fontSize = 11.sp,
+                                color = palette.secondaryTextColor,
+                                modifier = Modifier.padding(12.dp)
+                            )
+                        }
                     }
                 }
 
@@ -169,13 +286,13 @@ fun AppUpdateDialog(
                         verticalArrangement = Arrangement.spacedBy(2.dp)
                     ) {
                         Text(
-                            text = "起動時に更新を自動確認する",
+                            text = "起動時にGitHubの更新を自動確認する",
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
                             color = palette.textColor
                         )
                         Text(
-                            text = "新しいアップデートが利用可能な場合に通知します",
+                            text = "新しいAPKリリースが公開された場合に通知・案内します",
                             fontSize = 10.sp,
                             color = palette.secondaryTextColor
                         )
@@ -215,7 +332,8 @@ private fun UpdateStatusSection(
     palette: ThemePalette,
     onCheckForUpdates: () -> Unit,
     onStartDownloadAndInstall: () -> Unit,
-    onToggleSimulatedUpdate: () -> Unit,
+    onTriggerInstallApk: () -> Unit,
+    onOpenGitHubReleases: () -> Unit,
     onOpenPlayStore: () -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -244,7 +362,7 @@ private fun UpdateStatusSection(
                     border = androidx.compose.foundation.BorderStroke(1.dp, palette.cardBorderColor)
                 ) {
                     Text(
-                        text = "インストール済み: v${updateState.currentVersion}",
+                        text = "インストール中: v${updateState.currentVersion}",
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Medium,
                         color = palette.textColor,
@@ -261,7 +379,7 @@ private fun UpdateStatusSection(
                     )
                 ) {
                     Text(
-                        text = "最新配信版: v${updateState.latestVersion}",
+                        text = "GitHub最新: v${updateState.latestVersion}",
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
                         color = if (updateState.status == UpdateCheckStatus.UPDATE_AVAILABLE) palette.accentColor else palette.textColor,
@@ -270,7 +388,36 @@ private fun UpdateStatusSection(
                 }
             }
 
-            // Status details
+            // Error notice banner (if any)
+            if (!updateState.errorMessage.isNullOrBlank()) {
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = Color(0xFFD32F2F).copy(alpha = 0.15f),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFD32F2F).copy(alpha = 0.4f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Warning,
+                            contentDescription = "Notice",
+                            tint = Color(0xFFFF7043),
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Text(
+                            text = updateState.errorMessage,
+                            fontSize = 10.5.sp,
+                            color = Color(0xFFFFCCBC),
+                            lineHeight = 14.sp
+                        )
+                    }
+                }
+            }
+
+            // Status details & Actions
             when (updateState.status) {
                 UpdateCheckStatus.CHECKING -> {
                     Row(
@@ -287,7 +434,7 @@ private fun UpdateStatusSection(
                         )
                         Spacer(modifier = Modifier.width(12.dp))
                         Text(
-                            text = "最新のバージョン情報を照会中...",
+                            text = "GitHub Releasesの最新バージョンを確認中...",
                             fontSize = 12.sp,
                             color = palette.textColor
                         )
@@ -304,7 +451,7 @@ private fun UpdateStatusSection(
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Text(
-                                text = "アップデートをダウンロード中...",
+                                text = "GitHubからAPKをダウンロード中...",
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = palette.accentColor
@@ -335,31 +482,75 @@ private fun UpdateStatusSection(
                 }
 
                 UpdateCheckStatus.READY_TO_INSTALL -> {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 10.dp),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        CircularProgressIndicator(
-                            color = palette.accentColor,
-                            modifier = Modifier.size(20.dp),
-                            strokeWidth = 2.5.dp
-                        )
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Column {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Check,
+                                contentDescription = "Ready",
+                                tint = Color(0xFF4CAF50),
+                                modifier = Modifier.size(22.dp)
+                            )
                             Text(
-                                text = "パッケージを検証中...",
+                                text = "APKのダウンロードが完了しました！",
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = palette.textColor
+                                color = Color(0xFF4CAF50)
                             )
-                            Text(
-                                text = updateState.downloadSpeedText,
-                                fontSize = 10.sp,
-                                color = palette.secondaryTextColor
-                            )
+                        }
+
+                        Text(
+                            text = updateState.downloadSpeedText,
+                            fontSize = 10.sp,
+                            color = palette.secondaryTextColor
+                        )
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Button(
+                                onClick = onTriggerInstallApk,
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.weight(1.2f)
+                            ) {
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Check,
+                                        contentDescription = "Install",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Text(
+                                        text = "今すぐインストール",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.White
+                                    )
+                                }
+                            }
+
+                            OutlinedButton(
+                                onClick = onOpenGitHubReleases,
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.weight(0.8f)
+                            ) {
+                                Text(
+                                    text = "GitHubで確認",
+                                    fontSize = 11.sp,
+                                    color = palette.textColor
+                                )
+                            }
                         }
                     }
                 }
@@ -381,46 +572,30 @@ private fun UpdateStatusSection(
                                 modifier = Modifier.size(24.dp)
                             )
                             Text(
-                                text = "最新バージョンへの更新が完了しました！",
+                                text = "アップデート処理が完了しました！",
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = Color(0xFF4CAF50)
                             )
                         }
                         Text(
-                            text = "現在バージョン: v${updateState.currentVersion} が正常に稼働しています。",
+                            text = "現在バージョン: v${updateState.currentVersion} が稼働しています。",
                             fontSize = 11.sp,
                             color = palette.secondaryTextColor
                         )
 
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        Button(
+                            onClick = onDismiss,
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxWidth()
                         ) {
-                            Button(
-                                onClick = onDismiss,
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
-                                shape = RoundedCornerShape(8.dp),
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Text(
-                                    text = "完了",
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White
-                                )
-                            }
-                            OutlinedButton(
-                                onClick = onToggleSimulatedUpdate,
-                                shape = RoundedCornerShape(8.dp),
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Text(
-                                    text = "再テスト (v2.7.0)",
-                                    fontSize = 11.sp,
-                                    color = palette.textColor
-                                )
-                            }
+                            Text(
+                                text = "完了",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
                         }
                     }
                 }
@@ -428,7 +603,7 @@ private fun UpdateStatusSection(
                 UpdateCheckStatus.UPDATE_AVAILABLE -> {
                     Column(
                         modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
@@ -441,19 +616,56 @@ private fun UpdateStatusSection(
                                 modifier = Modifier.size(20.dp)
                             )
                             Text(
-                                text = "新しい更新プログラムが見つかりました！",
+                                text = "新しいGitHubリリース v${updateState.latestVersion} が利用可能！",
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = palette.accentColor
                             )
                         }
 
-                        Text(
-                            text = "バージョン v${updateState.latestVersion} では、新機能の追加や安定性向上が含まれています。（ファイル容量: 約 18.5 MB）",
-                            fontSize = 11.sp,
-                            color = palette.textColor,
-                            lineHeight = 15.sp
-                        )
+                        // Display detected APK details
+                        if (updateState.apkFileName.isNotBlank()) {
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = palette.containerColor,
+                                border = androidx.compose.foundation.BorderStroke(1.dp, palette.cardBorderColor),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Info,
+                                            contentDescription = "APK",
+                                            tint = palette.accentColor,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Text(
+                                            text = updateState.apkFileName,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = palette.textColor,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                    if (updateState.apkFileSize > 0) {
+                                        Text(
+                                            text = formatApkSize(updateState.apkFileSize),
+                                            fontSize = 10.5.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = palette.secondaryTextColor
+                                        )
+                                    }
+                                }
+                            }
+                        }
 
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -464,7 +676,7 @@ private fun UpdateStatusSection(
                                 colors = ButtonDefaults.buttonColors(containerColor = palette.accentColor),
                                 shape = RoundedCornerShape(8.dp),
                                 modifier = Modifier
-                                    .weight(1.2f)
+                                    .weight(1.3f)
                                     .testTag("start_update_download_button")
                             ) {
                                 Row(
@@ -473,13 +685,13 @@ private fun UpdateStatusSection(
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.Refresh,
-                                        contentDescription = "Download",
+                                        contentDescription = "Download APK",
                                         tint = Color.Black,
                                         modifier = Modifier.size(16.dp)
                                     )
                                     Text(
-                                        text = "今すぐダウンロードして更新",
-                                        fontSize = 11.sp,
+                                        text = "GitHubからAPKを更新",
+                                        fontSize = 11.5.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = Color.Black
                                     )
@@ -487,12 +699,12 @@ private fun UpdateStatusSection(
                             }
 
                             OutlinedButton(
-                                onClick = onOpenPlayStore,
+                                onClick = onOpenGitHubReleases,
                                 shape = RoundedCornerShape(8.dp),
-                                modifier = Modifier.weight(0.8f)
+                                modifier = Modifier.weight(0.7f)
                             ) {
                                 Text(
-                                    text = "ストアで確認",
+                                    text = "Releases",
                                     fontSize = 11.sp,
                                     color = palette.textColor
                                 )
@@ -501,34 +713,69 @@ private fun UpdateStatusSection(
                     }
                 }
 
-                else -> { // UP_TO_DATE or IDLE
+                else -> { // UP_TO_DATE, IDLE, ERROR
                     Column(
                         modifier = Modifier.fillMaxWidth(),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Check,
-                                contentDescription = "Up to date",
-                                tint = Color(0xFF4CAF50),
-                                modifier = Modifier.size(20.dp)
-                            )
+                        if (updateState.status == UpdateCheckStatus.ERROR) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Warning,
+                                    contentDescription = "Error",
+                                    tint = Color(0xFFFF5252),
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Text(
+                                    text = "アップデート確認エラー",
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFFFF5252)
+                                )
+                            }
                             Text(
-                                text = "お使いのシステムは最新です",
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = palette.textColor
+                                text = updateState.errorMessage ?: "更新情報の取得に失敗しました",
+                                fontSize = 11.sp,
+                                color = palette.secondaryTextColor
+                            )
+                        } else {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Check,
+                                    contentDescription = "Up to date",
+                                    tint = Color(0xFF4CAF50),
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Text(
+                                    text = if (updateState.errorMessage != null) "利用可能なアップデートはありません" else "お使いのアプリは最新です",
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = palette.textColor
+                                )
+                            }
+
+                            val description = when {
+                                updateState.errorMessage != null -> updateState.errorMessage
+                                updateState.latestVersion.isNotBlank() && updateState.latestVersion == updateState.currentVersion ->
+                                    "現在インストール中のバージョン (v${updateState.currentVersion}) は最新リリースと一致しています。新しい更新はありません。"
+                                updateState.status == UpdateCheckStatus.IDLE ->
+                                    "現在のバージョン (v${updateState.currentVersion}) のアップデートを確認できます。"
+                                else ->
+                                    "現在利用可能な新しいアップデートはありません (最新バージョン: v${updateState.currentVersion})。"
+                            }
+
+                            Text(
+                                text = description,
+                                fontSize = 11.sp,
+                                color = palette.secondaryTextColor
                             )
                         }
-
-                        Text(
-                            text = "新機能や不具合修正、セキュリティアップデートがすべて適用されています。",
-                            fontSize = 11.sp,
-                            color = palette.secondaryTextColor
-                        )
 
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -552,7 +799,7 @@ private fun UpdateStatusSection(
                                         modifier = Modifier.size(14.dp)
                                     )
                                     Text(
-                                        text = "更新を再確認",
+                                        text = "GitHubで再確認",
                                         fontSize = 11.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = palette.textColor
@@ -561,14 +808,14 @@ private fun UpdateStatusSection(
                             }
 
                             OutlinedButton(
-                                onClick = onToggleSimulatedUpdate,
+                                onClick = onOpenGitHubReleases,
                                 shape = RoundedCornerShape(8.dp),
                                 modifier = Modifier.weight(1f)
                             ) {
                                 Text(
-                                    text = "更新をシミュレート",
+                                    text = "Releasesページ",
                                     fontSize = 11.sp,
-                                    color = palette.secondaryTextColor
+                                    color = palette.textColor
                                 )
                             }
                         }
@@ -577,6 +824,12 @@ private fun UpdateStatusSection(
             }
         }
     }
+}
+
+private fun formatApkSize(bytes: Long): String {
+    if (bytes <= 0) return ""
+    val mb = bytes / (1024.0 * 1024.0)
+    return String.format(Locale.JAPAN, "%.1f MB", mb)
 }
 
 @Composable

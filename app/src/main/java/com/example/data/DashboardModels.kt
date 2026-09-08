@@ -174,6 +174,23 @@ data class AppReleaseNote(
     val isMajor: Boolean = false
 )
 
+data class GitHubReleaseAsset(
+    val name: String,
+    val size: Long,
+    val downloadUrl: String,
+    val contentType: String
+)
+
+data class GitHubReleaseInfo(
+    val tagName: String,
+    val version: String,
+    val name: String,
+    val body: String,
+    val publishedAt: String,
+    val htmlUrl: String,
+    val apkAsset: GitHubReleaseAsset?
+)
+
 enum class UpdateCheckStatus {
     IDLE,
     CHECKING,
@@ -186,14 +203,24 @@ enum class UpdateCheckStatus {
 }
 
 data class AppUpdateState(
-    val currentVersion: String = "2.5.0",
-    val latestVersion: String = "2.6.0",
+    val currentVersion: String = "1.0",
+    val latestVersion: String = "1.0",
     val status: UpdateCheckStatus = UpdateCheckStatus.IDLE,
     val downloadProgress: Float = 0f,
     val downloadSpeedText: String = "",
     val errorMessage: String? = null,
     val autoCheckEnabled: Boolean = true,
     val autoRefreshIntervalMinutes: Int = 30,
-    val releaseNotes: List<AppReleaseNote> = emptyList()
+    val releaseNotes: List<AppReleaseNote> = emptyList(),
+    // GitHub Releases Integration
+    val githubRepo: String = "dkym-123a456a7890/Andoroid-dashboard_forOLD",
+    val releaseTitle: String = "",
+    val releaseBody: String = "",
+    val releaseHtmlUrl: String = "",
+    val apkFileName: String = "",
+    val apkFileSize: Long = 0L,
+    val apkDownloadUrl: String = "",
+    val localApkFilePath: String? = null,
+    val hasApkInRelease: Boolean = false
 )
 

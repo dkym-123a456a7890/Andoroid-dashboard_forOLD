@@ -12,9 +12,12 @@ import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import okhttp3.ConnectionSpec
 import okhttp3.OkHttpClient
 import okhttp3.TlsVersion
+import kotlinx.coroutines.delay
+import retrofit2.HttpException
 import retrofit2.Retrofit
 import retrofit2.converter.moshi.MoshiConverterFactory
 import retrofit2.http.*
+import java.io.IOException
 import java.net.Socket
 import java.net.InetAddress
 import java.security.cert.X509Certificate
@@ -65,11 +68,57 @@ interface OpenMeteoService {
 }
 
 interface GeminiService {
+    @POST("v1beta/models/{model}:generateContent")
+    suspend fun generateContentWithModel(
+        @Path("model") model: String,
+        @Query("key") apiKey: String,
+        @Body request: GeminiRequest
+    ): GeminiResponse
+
     @POST("v1beta/models/gemini-3.5-flash:generateContent")
     suspend fun generateContent(
         @Query("key") apiKey: String,
         @Body request: GeminiRequest
     ): GeminiResponse
+}
+
+suspend fun GeminiService.generateContentWithRetry(
+    apiKey: String,
+    request: GeminiRequest,
+    preferredModel: String = "gemini-3.5-flash",
+    fallbackModel: String = "gemini-flash-latest",
+    maxRetriesPerModel: Int = 2
+): GeminiResponse {
+    var lastException: Exception? = null
+    val modelsToTry = listOf(preferredModel, fallbackModel).distinct()
+
+    for (model in modelsToTry) {
+        for (attempt in 0..maxRetriesPerModel) {
+            try {
+                return generateContentWithModel(model, apiKey, request)
+            } catch (e: HttpException) {
+                lastException = e
+                val code = e.code()
+                // Transient server overload or rate limiting: 503 (Unavailable), 429 (Rate Limit), 500/502/504
+                if (code == 503 || code == 429 || code == 500 || code == 502 || code == 504) {
+                    if (attempt < maxRetriesPerModel) {
+                        delay((attempt + 1) * 800L)
+                        continue
+                    }
+                } else {
+                    // Non-transient client error (e.g. 400 or 403)
+                    throw e
+                }
+            } catch (e: IOException) {
+                lastException = e
+                if (attempt < maxRetriesPerModel) {
+                    delay((attempt + 1) * 800L)
+                    continue
+                }
+            }
+        }
+    }
+    throw lastException ?: IOException("Failed to generate content with Gemini after retries")
 }
 
 interface WhatIsTodayService {
@@ -86,6 +135,7 @@ object ApiClient {
         .build()
 
     val okHttpClient = OkHttpClient.Builder().apply {
+        retryOnConnectionFailure(true)
         connectTimeout(30, TimeUnit.SECONDS)
         readTimeout(30, TimeUnit.SECONDS)
         writeTimeout(30, TimeUnit.SECONDS)

@@ -15,6 +15,8 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.BuildConfig
 import com.example.api.ApiClient
+import com.example.api.GitHubUpdateManager
+import com.example.api.generateContentWithRetry
 import com.example.data.*
 import com.squareup.moshi.Moshi
 import kotlinx.coroutines.Dispatchers
@@ -23,6 +25,7 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
 import okhttp3.Request
@@ -184,7 +187,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                     )
 
                     val response = withContext(Dispatchers.IO) {
-                        ApiClient.geminiService.generateContent(apiKey, request)
+                        ApiClient.geminiService.generateContentWithRetry(apiKey, request)
                     }
                     val responseText = response.candidates?.firstOrNull()?.content?.parts?.firstOrNull()?.text?.trim()
                     val finalResponse = if (!responseText.isNullOrEmpty()) {
@@ -198,7 +201,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                     _isAiReplying.value = false
                     _lastAiSpokenMessage.emit(finalResponse)
                 } catch (e: Exception) {
-                    Log.e("DashboardViewModel", "Gemini chat request failed: ${e.message}", e)
+                    Log.w("DashboardViewModel", "Gemini chat request unavailable (${e.message ?: "service busy"}), falling back to smart local reply")
                     val fallback = generateLocalSmartFallbackReply(trimmed, dateStr)
                     val aiMsg = ChatMessage(text = fallback, isUser = false)
                     _chatMessages.value = _chatMessages.value + aiMsg
@@ -471,91 +474,253 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
 
     private val _updateState = MutableStateFlow(
         run {
-            val savedVer = prefs.getString("installed_app_version", "2.5.0") ?: "2.5.0"
+            val installedVer = try {
+                getApplication<Application>().packageManager
+                    .getPackageInfo(getApplication<Application>().packageName, 0)
+                    .versionName ?: "1.0"
+            } catch (_: Exception) {
+                "1.0"
+            }
             val autoCheck = prefs.getBoolean("auto_check_updates", true)
             val autoRefreshMins = prefs.getInt("auto_refresh_interval_minutes", 30)
+            val defaultRepo = "dkym-123a456a7890/Andoroid-dashboard_forOLD"
+            var savedRepo = prefs.getString("github_repo_owner_repo", defaultRepo) ?: defaultRepo
+            if (savedRepo == "eitosabu196/SmartDashboard") {
+                savedRepo = defaultRepo
+                prefs.edit().putString("github_repo_owner_repo", defaultRepo).apply()
+            }
             AppUpdateState(
-                currentVersion = savedVer,
-                latestVersion = "2.6.0",
-                status = if (savedVer == "2.6.0") UpdateCheckStatus.UP_TO_DATE else UpdateCheckStatus.UPDATE_AVAILABLE,
+                currentVersion = installedVer,
+                latestVersion = installedVer,
+                status = UpdateCheckStatus.IDLE,
                 autoCheckEnabled = autoCheck,
                 autoRefreshIntervalMinutes = autoRefreshMins,
-                releaseNotes = DEFAULT_RELEASE_NOTES
+                releaseNotes = emptyList(),
+                githubRepo = savedRepo
             )
         }
     )
     val updateState: StateFlow<AppUpdateState> = _updateState.asStateFlow()
 
-    fun checkForUpdates() {
+    fun checkForUpdates(customRepo: String? = null) {
+        val repoToQuery = (customRepo ?: _updateState.value.githubRepo).trim()
         _updateState.value = _updateState.value.copy(
+            githubRepo = repoToQuery,
             status = UpdateCheckStatus.CHECKING,
             errorMessage = null
         )
+        prefs.edit().putString("github_repo_owner_repo", repoToQuery).apply()
+
         viewModelScope.launch {
-            delay(1200) // Realistic check network latency
-            val curr = _updateState.value.currentVersion
-            val target = _updateState.value.latestVersion
-            if (curr != target) {
-                _updateState.value = _updateState.value.copy(
-                    status = UpdateCheckStatus.UPDATE_AVAILABLE
+            val result = GitHubUpdateManager.fetchLatestRelease(repoToQuery)
+            result.onSuccess { info ->
+                if (info == null) {
+                    // Repository exists, but 0 releases published
+                    _updateState.value = _updateState.value.copy(
+                        status = UpdateCheckStatus.UP_TO_DATE,
+                        errorMessage = "リポジトリ ($repoToQuery) に公開されているリリースはありません。"
+                    )
+                    return@onSuccess
+                }
+
+                val curr = _updateState.value.currentVersion
+                val isNewer = isVersionNewer(curr, info.version)
+
+                val highlightsList = if (info.body.isNotBlank()) {
+                    info.body.lines()
+                        .map { it.trim().removePrefix("-").removePrefix("*").trim() }
+                        .filter { it.isNotBlank() }
+                        .take(8)
+                } else {
+                    listOf("新機能の追加およびパフォーマンスの改善")
+                }
+
+                val notes = listOf(
+                    AppReleaseNote(
+                        version = info.version,
+                        releaseDate = if (info.publishedAt.length >= 10) info.publishedAt.substring(0, 10) else "最新リリース",
+                        highlights = highlightsList,
+                        isMajor = isNewer
+                    )
                 )
-            } else {
+
+                if (!isNewer) {
+                    // Version is up to date - no newer update
+                    _updateState.value = _updateState.value.copy(
+                        latestVersion = info.version,
+                        status = UpdateCheckStatus.UP_TO_DATE,
+                        releaseTitle = info.name,
+                        releaseBody = info.body,
+                        releaseHtmlUrl = info.htmlUrl,
+                        apkFileName = info.apkAsset?.name ?: "",
+                        apkFileSize = info.apkAsset?.size ?: 0L,
+                        apkDownloadUrl = info.apkAsset?.downloadUrl ?: "",
+                        hasApkInRelease = info.apkAsset != null,
+                        releaseNotes = notes,
+                        errorMessage = null
+                    )
+                } else if (info.apkAsset == null) {
+                    // Newer tag exists, but no APK attached
+                    _updateState.value = _updateState.value.copy(
+                        latestVersion = info.version,
+                        status = UpdateCheckStatus.UP_TO_DATE,
+                        releaseTitle = info.name,
+                        releaseBody = info.body,
+                        releaseHtmlUrl = info.htmlUrl,
+                        apkFileName = "",
+                        apkFileSize = 0L,
+                        apkDownloadUrl = "",
+                        hasApkInRelease = false,
+                        releaseNotes = notes,
+                        errorMessage = "最新リリース (${info.tagName}) が見つかりましたが、APKファイル (.apk) が添付されていません。GitHub ReleasesにAPKをアップロードしてください。"
+                    )
+                } else {
+                    // Real newer release with APK
+                    _updateState.value = _updateState.value.copy(
+                        latestVersion = info.version,
+                        status = UpdateCheckStatus.UPDATE_AVAILABLE,
+                        releaseTitle = info.name,
+                        releaseBody = info.body,
+                        releaseHtmlUrl = info.htmlUrl,
+                        apkFileName = info.apkAsset.name,
+                        apkFileSize = info.apkAsset.size,
+                        apkDownloadUrl = info.apkAsset.downloadUrl,
+                        hasApkInRelease = true,
+                        releaseNotes = notes,
+                        errorMessage = null
+                    )
+                }
+            }.onFailure { err ->
+                Log.w("DashboardViewModel", "GitHub check failed for $repoToQuery", err)
                 _updateState.value = _updateState.value.copy(
-                    status = UpdateCheckStatus.UP_TO_DATE
+                    status = UpdateCheckStatus.UP_TO_DATE,
+                    errorMessage = "更新確認結果: ${err.localizedMessage ?: "接続エラー"}"
                 )
             }
         }
     }
 
-    fun startDownloadAndInstall() {
+    private fun isVersionNewer(current: String, candidate: String): Boolean {
+        val cleanCurr = current.trim().removePrefix("v").removePrefix("V").trim()
+        val cleanCand = candidate.trim().removePrefix("v").removePrefix("V").trim()
+        if (cleanCurr == cleanCand) return false
+        val currentParts = cleanCurr.split(".").mapNotNull { it.toIntOrNull() }
+        val candidateParts = cleanCand.split(".").mapNotNull { it.toIntOrNull() }
+        val maxLen = maxOf(currentParts.size, candidateParts.size)
+        for (i in 0 until maxLen) {
+            val currVal = currentParts.getOrElse(i) { 0 }
+            val candVal = candidateParts.getOrElse(i) { 0 }
+            if (candVal > currVal) return true
+            if (candVal < currVal) return false
+        }
+        return false
+    }
+
+    fun startDownloadAndInstall(context: Context = getApplication()) {
         if (_updateState.value.status == UpdateCheckStatus.DOWNLOADING) return
+
+        val downloadUrl = _updateState.value.apkDownloadUrl
+        val fileName = _updateState.value.apkFileName.ifEmpty { "smart_dashboard_v${_updateState.value.latestVersion}.apk" }
+
+        if (downloadUrl.isBlank() || (!downloadUrl.startsWith("http://") && !downloadUrl.startsWith("https://"))) {
+            _updateState.value = _updateState.value.copy(
+                status = UpdateCheckStatus.ERROR,
+                errorMessage = "ダウンロード可能なAPKファイルがありません。GitHub ReleasesにAPKが添付されているか確認してください。"
+            )
+            return
+        }
+
         _updateState.value = _updateState.value.copy(
             status = UpdateCheckStatus.DOWNLOADING,
             downloadProgress = 0f,
-            downloadSpeedText = "サーバーに接続中..."
+            downloadSpeedText = "GitHub Releasesからダウンロードを開始...",
+            errorMessage = null
         )
+
         viewModelScope.launch {
-            val steps = listOf(
-                Triple(0.18f, "3.3 MB / 18.5 MB (4.1 MB/s)", 350L),
-                Triple(0.42f, "7.8 MB / 18.5 MB (4.4 MB/s)", 400L),
-                Triple(0.68f, "12.6 MB / 18.5 MB (4.2 MB/s)", 400L),
-                Triple(0.92f, "17.0 MB / 18.5 MB (3.9 MB/s)", 350L),
-                Triple(1.00f, "18.5 MB / 18.5 MB (ダウンロード完了)", 250L)
-            )
-            for ((progress, speedText, waitMs) in steps) {
-                delay(waitMs)
+            val result = GitHubUpdateManager.downloadApk(
+                context = context,
+                downloadUrl = downloadUrl,
+                targetFileName = fileName
+            ) { bytesDownloaded, totalBytes, progressFraction, speedBps ->
+                val mbDownloaded = bytesDownloaded / (1024f * 1024f)
+                val mbTotal = if (totalBytes > 0) totalBytes / (1024f * 1024f) else 0f
+                val speedMb = speedBps / (1024f * 1024f)
+
+                val speedText = if (mbTotal > 0) {
+                    String.format(Locale.JAPAN, "%.1f MB / %.1f MB (%.1f MB/s)", mbDownloaded, mbTotal, speedMb)
+                } else {
+                    String.format(Locale.JAPAN, "%.1f MB (%.1f MB/s)", mbDownloaded, speedMb)
+                }
+
                 _updateState.value = _updateState.value.copy(
-                    downloadProgress = progress,
+                    downloadProgress = progressFraction,
                     downloadSpeedText = speedText
                 )
             }
 
-            _updateState.value = _updateState.value.copy(
-                status = UpdateCheckStatus.READY_TO_INSTALL,
-                downloadSpeedText = "パッケージ検証中 (SHA-256 Checksum OK)..."
-            )
-            delay(800)
+            result.onSuccess { apkFile ->
+                _updateState.value = _updateState.value.copy(
+                    status = UpdateCheckStatus.READY_TO_INSTALL,
+                    localApkFilePath = apkFile.absolutePath,
+                    downloadSpeedText = "ダウンロード完了: ${apkFile.name} (${String.format(Locale.JAPAN, "%.1f MB", apkFile.length() / (1024f * 1024f))})"
+                )
 
-            val newVersion = _updateState.value.latestVersion
-            prefs.edit().putString("installed_app_version", newVersion).apply()
-
-            _updateState.value = _updateState.value.copy(
-                currentVersion = newVersion,
-                status = UpdateCheckStatus.COMPLETED,
-                downloadSpeedText = "アップデート完了！"
-            )
+                // Launch package installer
+                val installResult = GitHubUpdateManager.installApk(context, apkFile)
+                if (installResult.isSuccess) {
+                    _updateState.value = _updateState.value.copy(
+                        status = UpdateCheckStatus.COMPLETED,
+                        downloadSpeedText = "インストーラーを起動しました。画面の指示に従ってインストールを完了してください。"
+                    )
+                } else {
+                    _updateState.value = _updateState.value.copy(
+                        errorMessage = installResult.exceptionOrNull()?.message
+                    )
+                }
+            }.onFailure { err ->
+                Log.e("DashboardViewModel", "APK download failed", err)
+                _updateState.value = _updateState.value.copy(
+                    status = UpdateCheckStatus.ERROR,
+                    errorMessage = "ダウンロードに失敗しました: ${err.localizedMessage}"
+                )
+            }
         }
     }
 
-    fun resetOrToggleSimulatedUpdate() {
-        val current = _updateState.value.currentVersion
-        val nextVersion = if (current == "2.6.0") "2.7.0" else "2.6.0"
-        _updateState.value = _updateState.value.copy(
-            latestVersion = nextVersion,
-            status = UpdateCheckStatus.UPDATE_AVAILABLE,
-            downloadProgress = 0f,
-            downloadSpeedText = ""
-        )
+    fun triggerInstallApk(context: Context = getApplication()) {
+        val path = _updateState.value.localApkFilePath
+        if (path != null) {
+            val file = File(path)
+            if (file.exists()) {
+                val result = GitHubUpdateManager.installApk(context, file)
+                if (result.isFailure) {
+                    _updateState.value = _updateState.value.copy(
+                        errorMessage = result.exceptionOrNull()?.message
+                    )
+                }
+            }
+        }
+    }
+
+    fun setGitHubRepo(repo: String) {
+        val clean = repo.trim().removePrefix("https://github.com/").removeSuffix("/")
+        _updateState.value = _updateState.value.copy(githubRepo = clean)
+        prefs.edit().putString("github_repo_owner_repo", clean).apply()
+    }
+
+    fun openGitHubReleases(context: Context) {
+        val url = _updateState.value.releaseHtmlUrl.ifEmpty {
+            "https://github.com/${_updateState.value.githubRepo}/releases"
+        }
+        try {
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            context.startActivity(intent)
+        } catch (e: Exception) {
+            Toast.makeText(context, "ブラウザを開けませんでした: $url", Toast.LENGTH_SHORT).show()
+        }
     }
 
     fun setAutoCheckUpdates(enabled: Boolean) {
@@ -1203,7 +1368,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                     longitude = region.longitude
                 )
             } catch (e: Exception) {
-                Log.e("DashboardViewModel", "Error fetching weather", e)
+                Log.w("DashboardViewModel", "Weather fetch unavailable: ${e.message}")
                 null
             }
         }
@@ -1233,7 +1398,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                 }
             }
         } catch (e: Exception) {
-            Log.e("DashboardViewModel", "Yahoo News fetch failed, falling back to NHK News", e)
+            Log.w("DashboardViewModel", "Yahoo News fetch unavailable, falling back to NHK News: ${e.message}")
         }
 
         if (list.isNotEmpty()) return list
@@ -1248,12 +1413,12 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                         val xml = response.body?.string() ?: ""
                         parseNhkNews(xml)
                     } else {
-                        Log.e("DashboardViewModel", "NHK News fetch failed: ${response.code}")
+                        Log.w("DashboardViewModel", "NHK News fetch returned non-200: ${response.code}")
                         emptyList()
                     }
                 }
             } catch (e: Exception) {
-                Log.e("DashboardViewModel", "Error fetching NHK News", e)
+                Log.w("DashboardViewModel", "NHK News fetch unavailable: ${e.message}")
                 emptyList()
             }
         }
@@ -1320,12 +1485,12 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                         val html = response.body?.string() ?: ""
                         parseYahooTrends(html)
                     } else {
-                        Log.e("DashboardViewModel", "Yahoo Trends fetch failed: ${response.code}")
+                        Log.w("DashboardViewModel", "Yahoo Trends fetch returned non-200: ${response.code}")
                         emptyList()
                     }
                 }
             } catch (e: Exception) {
-                Log.e("DashboardViewModel", "Error fetching Yahoo Trends", e)
+                Log.w("DashboardViewModel", "Yahoo Trends fetch unavailable: ${e.message}")
                 emptyList()
             }
         }
@@ -1362,7 +1527,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                 }
             }
         } catch (e: Exception) {
-            Log.e("DashboardViewModel", "Error parsing Yahoo Trends", e)
+            Log.w("DashboardViewModel", "Error parsing Yahoo Trends: ${e.message}")
         }
         return list
     }
@@ -1385,7 +1550,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                 ).map { it.trim() }.filter { it.isNotEmpty() && !it.contains("ほかの日も見てみよう") }
                 anniversaries.addAll(rawAnnivs)
             } catch (e: Exception) {
-                Log.e("DashboardViewModel", "Error fetching anniversaries from whatistoday.cyou", e)
+                Log.w("DashboardViewModel", "whatistoday.cyou anniversaries unavailable, using built-in calendar: ${e.message}")
             }
 
             // Fill up to 5 anniversaries using fallback if needed
@@ -1415,7 +1580,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                     birthdays.add(formatted)
                 }
             } catch (e: Exception) {
-                Log.e("DashboardViewModel", "Error fetching famous birthday from whatistoday.cyou", e)
+                Log.w("DashboardViewModel", "whatistoday.cyou famous birthday unavailable, using built-in calendar: ${e.message}")
             }
 
             // Supplement with famous birthdays for this date to reach exactly 3 items
@@ -1521,7 +1686,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                     generationConfig = GeminiGenerationConfig(responseMimeType = "application/json", temperature = 0.7)
                 )
 
-                val response = ApiClient.geminiService.generateContent(apiKey, request)
+                val response = ApiClient.geminiService.generateContentWithRetry(apiKey, request)
                 val jsonString = response.candidates?.firstOrNull()?.content?.parts?.firstOrNull()?.text?.trim() ?: ""
                 Log.d("DashboardViewModel", "Gemini Local Response: $jsonString")
 
@@ -1543,7 +1708,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                     isMock = true
                 }
             } catch (e: Exception) {
-                Log.e("DashboardViewModel", "Error fetching Gemini local curation", e)
+                Log.w("DashboardViewModel", "Gemini local curation unavailable (${e.message ?: "service busy"}), falling back to curated local content")
                 val fallbackLocal = getFallbackLocalContent(region)
                 localTips = fallbackLocal.first
                 localNewsList = fallbackLocal.second

@@ -777,8 +777,9 @@ fun DashboardApp() {
             updateState = updateState,
             palette = palette,
             onCheckForUpdates = { viewModel.checkForUpdates() },
-            onStartDownloadAndInstall = { viewModel.startDownloadAndInstall() },
-            onToggleSimulatedUpdate = { viewModel.resetOrToggleSimulatedUpdate() },
+            onStartDownloadAndInstall = { viewModel.startDownloadAndInstall(context) },
+            onTriggerInstallApk = { viewModel.triggerInstallApk(context) },
+            onOpenGitHubReleases = { viewModel.openGitHubReleases(context) },
             onSetAutoCheckUpdates = { viewModel.setAutoCheckUpdates(it) },
             onOpenPlayStore = { viewModel.openPlayStore(context) },
             onDismiss = { showUpdateDialog = false }
@@ -1046,51 +1047,6 @@ fun LeftClockWeatherPanel(
                             color = palette.secondaryTextColor,
                             fontWeight = FontWeight.SemiBold
                         )
-                    }
-                }
-
-                // Quick Update Check Button
-                Surface(
-                    onClick = onOpenUpdateDialog,
-                    shape = RoundedCornerShape(10.dp),
-                    color = if (updateState.status == UpdateCheckStatus.UPDATE_AVAILABLE) palette.accentColor.copy(alpha = 0.2f) else palette.buttonColor,
-                    border = androidx.compose.foundation.BorderStroke(
-                        1.dp,
-                        if (updateState.status == UpdateCheckStatus.UPDATE_AVAILABLE) palette.accentColor else palette.cardBorderColor
-                    ),
-                    modifier = Modifier.testTag("quick_update_button")
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(5.dp)
-                    ) {
-                        if (updateState.status == UpdateCheckStatus.UPDATE_AVAILABLE) {
-                            Box(
-                                modifier = Modifier
-                                    .size(7.dp)
-                                    .background(Color(0xFFFF9800), CircleShape)
-                            )
-                            Text(
-                                text = "v${updateState.currentVersion} • 更新あり (v${updateState.latestVersion})",
-                                fontSize = 10.5.sp,
-                                color = palette.accentColor,
-                                fontWeight = FontWeight.Bold
-                            )
-                        } else {
-                            Icon(
-                                imageVector = Icons.Default.Refresh,
-                                contentDescription = "Update Check",
-                                tint = palette.secondaryTextColor,
-                                modifier = Modifier.size(11.dp)
-                            )
-                            Text(
-                                text = "v${updateState.currentVersion} • アップデート確認",
-                                fontSize = 10.5.sp,
-                                color = palette.secondaryTextColor,
-                                fontWeight = FontWeight.Medium
-                            )
-                        }
                     }
                 }
 
@@ -3142,7 +3098,8 @@ fun SettingsDialog(
                                     UpdateCheckStatus.DOWNLOADING -> "ダウンロード中 (${(updateState.downloadProgress * 100).toInt()}%)"
                                     UpdateCheckStatus.READY_TO_INSTALL -> "インストール準備完了"
                                     UpdateCheckStatus.COMPLETED -> "最新バージョンに更新完了！"
-                                    UpdateCheckStatus.UP_TO_DATE -> "お使いのアプリは最新です"
+                                    UpdateCheckStatus.UP_TO_DATE -> updateState.errorMessage ?: "お使いのアプリは最新です"
+                                    UpdateCheckStatus.ERROR -> updateState.errorMessage ?: "更新確認エラー"
                                     else -> "最新の更新プログラムを確認できます"
                                 }
                                 Text(
@@ -3438,22 +3395,6 @@ fun AppLauncherDrawerContent(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                if (onOpenUpdateDialog != null) {
-                    IconButton(
-                        onClick = onOpenUpdateDialog,
-                        modifier = Modifier
-                            .size(32.dp)
-                            .background(palette.buttonColor, CircleShape)
-                            .border(1.dp, palette.cardBorderColor, CircleShape)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Refresh,
-                            contentDescription = "アップデート確認",
-                            tint = palette.accentColor,
-                            modifier = Modifier.size(16.dp)
-                        )
-                    }
-                }
                 IconButton(
                     onClick = onClose,
                     modifier = Modifier

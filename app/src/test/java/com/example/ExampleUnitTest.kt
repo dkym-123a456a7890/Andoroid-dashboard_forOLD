@@ -18,8 +18,8 @@ class ExampleUnitTest {
   @Test
   fun updateState_defaultValues() {
     val state = AppUpdateState()
-    assertEquals("2.5.0", state.currentVersion)
-    assertEquals("2.6.0", state.latestVersion)
+    assertEquals("1.0", state.currentVersion)
+    assertEquals("1.0", state.latestVersion)
     assertEquals(UpdateCheckStatus.IDLE, state.status)
     assertEquals(30, state.autoRefreshIntervalMinutes)
     assertTrue(state.autoCheckEnabled)
@@ -39,5 +39,19 @@ class ExampleUnitTest {
 
     state = state.copy(status = UpdateCheckStatus.COMPLETED, currentVersion = "2.6.0")
     assertEquals("2.6.0", state.currentVersion)
+  }
+
+  @Test
+  fun updateState_gitHubReleasesFields() {
+    val state = AppUpdateState(
+      githubRepo = "dkym-123a456a7890/Andoroid-dashboard_forOLD",
+      apkFileName = "SmartDashboard-v2.6.0.apk",
+      apkFileSize = 18500000L,
+      apkDownloadUrl = "https://github.com/dkym-123a456a7890/Andoroid-dashboard_forOLD/releases/download/v2.6.0/SmartDashboard-v2.6.0.apk"
+    )
+    assertEquals("dkym-123a456a7890/Andoroid-dashboard_forOLD", state.githubRepo)
+    assertEquals("SmartDashboard-v2.6.0.apk", state.apkFileName)
+    assertEquals(18500000L, state.apkFileSize)
+    assertTrue(state.apkDownloadUrl.startsWith("https://"))
   }
 }
