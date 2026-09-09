@@ -20,4 +20,8 @@ class TaskRepository(private val taskDao: TaskDao) {
     suspend fun deleteById(id: Int) {
         taskDao.deleteTaskById(id)
     }
+
+    suspend fun deleteAll() {
+        taskDao.deleteAllTasks()
+    }
 }

@@ -91,7 +91,9 @@ import com.example.ui.PhotoItem
 import com.example.ui.QrUtils
 import com.example.ui.REGIONS
 import com.example.ui.RegionConfig
+import com.example.ui.SettingsDialog
 import com.example.ui.WeatherUiState
+import com.example.ui.WelcomeSetupScreen
 import com.example.ui.theme.MyApplicationTheme
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -348,6 +350,32 @@ fun DashboardApp() {
     }
 
     val updateState by viewModel.updateState.collectAsState()
+    val isSetupCompleted by viewModel.isSetupCompleted.collectAsState()
+
+    // First launch or factory reset: show Welcome & Initial Setup Wizard
+    if (!isSetupCompleted) {
+        WelcomeSetupScreen(
+            currentThemeIndex = backgroundThemeIndex,
+            selectedRegion = selectedRegion,
+            onThemeSelected = { viewModel.changeBackground(it) },
+            onRegionSelected = { viewModel.changeRegion(it) },
+            onPostalCodeSubmitted = { code, callback ->
+                coroutineScope.launch {
+                    val result = viewModel.setAddressByPostalCode(code)
+                    if (result.isSuccess) {
+                        callback(true, "住所を設定しました: ${result.getOrNull()}")
+                    } else {
+                        callback(false, result.exceptionOrNull()?.message ?: "検索に失敗しました")
+                    }
+                }
+            },
+            onCompleteSetup = {
+                viewModel.completeSetup()
+            }
+        )
+        return
+    }
+
     var showSettingsDialog by remember { mutableStateOf(false) }
     var showUpdateDialog by remember { mutableStateOf(false) }
     var showQrDialogText by remember { mutableStateOf<Pair<String, String>?>(null) }
@@ -768,6 +796,8 @@ fun DashboardApp() {
             },
             onCheckForUpdates = { viewModel.checkForUpdates() },
             onAutoRefreshIntervalChanged = { viewModel.setAutoRefreshIntervalMinutes(it) },
+            onResetAllData = { viewModel.resetAllDataAndSettings() },
+            onOpenSetupWizard = { viewModel.startSetupAgain() },
             onDismiss = { showSettingsDialog = false }
         )
     }
@@ -2679,528 +2709,7 @@ private fun getWeatherIconColorJp(code: Int): Color {
     }
 }
 
-/**
- * Settings Dialog: Completely opaque popup background and card.
- * Includes postal code address lookup.
- */
-@Composable
-fun SettingsDialog(
-    selectedRegion: RegionConfig,
-    backgroundThemeIndex: Int,
-    launcherColumns: Int,
-    palette: ThemePalette,
-    updateState: AppUpdateState,
-    onRegionSelected: (RegionConfig) -> Unit,
-    onBackgroundSelected: (Int) -> Unit,
-    onLauncherColumnsChanged: (Int) -> Unit,
-    onPostalCodeSubmitted: (String, (Boolean, String) -> Unit) -> Unit,
-    onOpenUpdateDialog: () -> Unit,
-    onCheckForUpdates: () -> Unit,
-    onAutoRefreshIntervalChanged: (Int) -> Unit,
-    onDismiss: () -> Unit
-) {
-    val context = LocalContext.current
-    var postalCodeInput by remember { mutableStateOf("") }
-    var isSearchingPostalCode by remember { mutableStateOf(false) }
-    var postalCodeStatusMessage by remember { mutableStateOf<Pair<Boolean, String>?>(null) }
-    val focusManager = LocalFocusManager.current
-
-    LaunchedEffect(Unit) {
-        for (i in 1..4) {
-            delay(150 * i.toLong())
-            (context as? MainActivity)?.setImmersiveFullscreen()
-        }
-    }
-
-    // Completely opaque dark backdrop overlay
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0xCC000000))
-            .clickable(enabled = true, onClick = onDismiss),
-        contentAlignment = Alignment.Center
-    ) {
-        // Completely opaque popup dialog card
-        Card(
-            shape = RoundedCornerShape(24.dp),
-            colors = CardDefaults.cardColors(containerColor = palette.containerColor),
-            modifier = Modifier
-                .width(500.dp)
-                .wrapContentHeight()
-                .border(1.5.dp, palette.cardBorderColor, RoundedCornerShape(24.dp))
-                .clickable(enabled = false) { /* Prevent click propagation to overlay dismiss */ }
-                .padding(16.dp),
-            elevation = CardDefaults.cardElevation(defaultElevation = 12.dp)
-        ) {
-            Column(
-                modifier = Modifier
-                    .background(palette.containerColor)
-                    .padding(20.dp)
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "システム設定",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = palette.textColor
-                    )
-                    IconButton(
-                        onClick = onDismiss,
-                        modifier = Modifier.size(36.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Close,
-                            contentDescription = "Dismiss",
-                            tint = palette.secondaryTextColor
-                        )
-                    }
-                }
-
-                HorizontalDivider(color = palette.cardBorderColor)
-
-                // App Launcher Columns Setting Section
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Text(
-                        text = "■ アプリランチャーの横並び数 (現在: ${launcherColumns}列)",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = palette.accentColor
-                    )
-                    Text(
-                        text = "アプリ一覧メニューで1行に表示するアプリアイコンの列数を設定できます。",
-                        fontSize = 11.sp,
-                        color = palette.secondaryTextColor
-                    )
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        listOf(2, 3, 4, 5, 6).forEach { cols ->
-                            val isSelected = cols == launcherColumns
-                            Button(
-                                onClick = { onLauncherColumnsChanged(cols) },
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = if (isSelected) palette.accentColor else palette.buttonColor
-                                ),
-                                shape = RoundedCornerShape(8.dp),
-                                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 6.dp),
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Text(
-                                    text = "${cols}列",
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = if (isSelected) Color(0xFF090B0F) else palette.textColor
-                                )
-                            }
-                        }
-                    }
-                }
-
-                HorizontalDivider(color = palette.cardBorderColor)
-
-                // Postal Code Address Setting Section
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Text(
-                        text = "■ 郵便番号で住所を設定",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = palette.accentColor
-                    )
-                    Text(
-                        text = "郵便番号（7桁）を入力して、天気やAIチャットの地域をカスタム設定できます。",
-                        fontSize = 11.sp,
-                        color = palette.secondaryTextColor
-                    )
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        OutlinedTextField(
-                            value = postalCodeInput,
-                            onValueChange = { postalCodeInput = it },
-                            placeholder = { Text("例: 523-0891 または 1000001", fontSize = 11.sp, color = palette.secondaryTextColor) },
-                            singleLine = true,
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = palette.accentColor,
-                                unfocusedBorderColor = palette.cardBorderColor,
-                                focusedTextColor = palette.textColor,
-                                unfocusedTextColor = palette.textColor,
-                                focusedContainerColor = palette.buttonColor,
-                                unfocusedContainerColor = palette.buttonColor
-                            ),
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(46.dp),
-                            keyboardOptions = KeyboardOptions(
-                                keyboardType = KeyboardType.Number,
-                                imeAction = ImeAction.Done
-                            ),
-                            keyboardActions = KeyboardActions(onDone = {
-                                if (postalCodeInput.isNotBlank() && !isSearchingPostalCode) {
-                                    isSearchingPostalCode = true
-                                    postalCodeStatusMessage = null
-                                    focusManager.clearFocus()
-                                    onPostalCodeSubmitted(postalCodeInput) { success, msg ->
-                                        isSearchingPostalCode = false
-                                        postalCodeStatusMessage = success to msg
-                                    }
-                                }
-                            })
-                        )
-
-                        Button(
-                            onClick = {
-                                if (postalCodeInput.isNotBlank() && !isSearchingPostalCode) {
-                                    isSearchingPostalCode = true
-                                    postalCodeStatusMessage = null
-                                    focusManager.clearFocus()
-                                    onPostalCodeSubmitted(postalCodeInput) { success, msg ->
-                                        isSearchingPostalCode = false
-                                        postalCodeStatusMessage = success to msg
-                                    }
-                                }
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = palette.accentColor),
-                            shape = RoundedCornerShape(10.dp),
-                            modifier = Modifier.height(46.dp)
-                        ) {
-                            if (isSearchingPostalCode) {
-                                CircularProgressIndicator(
-                                    color = Color.Black,
-                                    modifier = Modifier.size(16.dp),
-                                    strokeWidth = 2.dp
-                                )
-                            } else {
-                                Text(
-                                    text = "検索・適用",
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color(0xFF090B0F)
-                                )
-                            }
-                        }
-                    }
-
-                    // Status feedback
-                    postalCodeStatusMessage?.let { (success, msg) ->
-                        Text(
-                            text = (if (success) "✓ " else "⚠ ") + msg,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = if (success) Color(0xFF81C784) else Color(0xFFEF5350)
-                        )
-                    }
-                }
-
-                HorizontalDivider(color = palette.cardBorderColor)
-
-                // Background Theme Selection
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Text(
-                        text = "■ 背景テーマを選択",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = palette.accentColor
-                    )
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        val themes = listOf(
-                            Color(0xFF0D1117) to "アビス",
-                            Color(0xFF0A1410) to "エメラルド",
-                            Color(0xFF13091F) to "トワイライト",
-                            Color(0xFF1A0A0E) to "ルビー",
-                            Color(0xFF121212) to "カーボン"
-                        )
-                        themes.forEachIndexed { idx, (color, name) ->
-                            val isSelected = idx == backgroundThemeIndex
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .clickable { onBackgroundSelected(idx) }
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(36.dp)
-                                        .background(color, CircleShape)
-                                        .border(
-                                            width = if (isSelected) 3.dp else 1.dp,
-                                            color = if (isSelected) palette.accentColor else palette.cardBorderColor,
-                                            shape = CircleShape
-                                        ),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    if (isSelected) {
-                                        Icon(
-                                            imageVector = Icons.Default.Check,
-                                            contentDescription = "Selected",
-                                            tint = palette.accentColor,
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                    }
-                                }
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    text = name,
-                                    fontSize = 10.sp,
-                                    color = if (isSelected) palette.textColor else palette.secondaryTextColor,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        }
-                    }
-                }
-
-                HorizontalDivider(color = palette.cardBorderColor)
-
-                // Kiosk / Launcher Support
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                    horizontalAlignment = Alignment.Start
-                ) {
-                    Text(
-                        text = "■ キオスク/ランチャー設定",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = palette.accentColor
-                    )
-
-                    Text(
-                        text = "本アプリはホーム画面（ランチャー）として動作させることができます。標準のランチャーに戻す、またはデフォルトランチャーを切り替えるには、下記のシステム設定を開いて変更してください。",
-                        fontSize = 11.sp,
-                        lineHeight = 15.sp,
-                        color = palette.secondaryTextColor
-                    )
-
-                    Button(
-                        onClick = {
-                            try {
-                                val intent = Intent(Settings.ACTION_HOME_SETTINGS).apply {
-                                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                                }
-                                context.startActivity(intent)
-                            } catch (e: Exception) {
-                                try {
-                                    val intent = Intent(Settings.ACTION_SETTINGS).apply {
-                                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                                    }
-                                    context.startActivity(intent)
-                                } catch (ex: Exception) {}
-                            }
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = palette.buttonColor),
-                        shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Home,
-                                contentDescription = "Home",
-                                modifier = Modifier.size(16.dp),
-                                tint = palette.textColor
-                            )
-                            Text(
-                                text = "システムのホームアプリ設定を開く",
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = palette.textColor
-                            )
-                        }
-                    }
-                }
-
-                HorizontalDivider(color = palette.cardBorderColor)
-
-                // Software Update & Auto-Refresh Settings Section
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                    horizontalAlignment = Alignment.Start
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "■ ソフトウェアアップデート・自動更新",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = palette.accentColor
-                        )
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = if (updateState.status == UpdateCheckStatus.UPDATE_AVAILABLE) Color(0xFFFF9800).copy(alpha = 0.2f) else palette.buttonColor,
-                            border = androidx.compose.foundation.BorderStroke(
-                                1.dp,
-                                if (updateState.status == UpdateCheckStatus.UPDATE_AVAILABLE) Color(0xFFFF9800) else palette.cardBorderColor
-                            )
-                        ) {
-                            Text(
-                                text = "Ver ${updateState.currentVersion}",
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = if (updateState.status == UpdateCheckStatus.UPDATE_AVAILABLE) Color(0xFFFFB74D) else palette.textColor,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                            )
-                        }
-                    }
-
-                    // Update Status Banner
-                    Card(
-                        shape = RoundedCornerShape(12.dp),
-                        colors = CardDefaults.cardColors(containerColor = palette.buttonColor),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, palette.cardBorderColor),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(12.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(
-                                verticalArrangement = Arrangement.spacedBy(2.dp),
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                val statusText = when (updateState.status) {
-                                    UpdateCheckStatus.CHECKING -> "更新を確認中..."
-                                    UpdateCheckStatus.UPDATE_AVAILABLE -> "新バージョン v${updateState.latestVersion} が利用可能！"
-                                    UpdateCheckStatus.DOWNLOADING -> "ダウンロード中 (${(updateState.downloadProgress * 100).toInt()}%)"
-                                    UpdateCheckStatus.READY_TO_INSTALL -> "インストール準備完了"
-                                    UpdateCheckStatus.COMPLETED -> "最新バージョンに更新完了！"
-                                    UpdateCheckStatus.UP_TO_DATE -> updateState.errorMessage ?: "お使いのアプリは最新です"
-                                    UpdateCheckStatus.ERROR -> updateState.errorMessage ?: "更新確認エラー"
-                                    else -> "最新の更新プログラムを確認できます"
-                                }
-                                Text(
-                                    text = statusText,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = if (updateState.status == UpdateCheckStatus.UPDATE_AVAILABLE) palette.accentColor else palette.textColor
-                                )
-                                Text(
-                                    text = "新機能、UI改善、バグ修正の確認と適用",
-                                    fontSize = 10.sp,
-                                    color = palette.secondaryTextColor
-                                )
-                            }
-
-                            Button(
-                                onClick = onOpenUpdateDialog,
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = if (updateState.status == UpdateCheckStatus.UPDATE_AVAILABLE) palette.accentColor else palette.containerColor
-                                ),
-                                shape = RoundedCornerShape(8.dp),
-                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-                                border = androidx.compose.foundation.BorderStroke(1.dp, palette.cardBorderColor),
-                                modifier = Modifier.testTag("open_update_dialog_button")
-                            ) {
-                                Row(
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Refresh,
-                                        contentDescription = "Update Check",
-                                        tint = if (updateState.status == UpdateCheckStatus.UPDATE_AVAILABLE) Color.Black else palette.textColor,
-                                        modifier = Modifier.size(14.dp)
-                                    )
-                                    Text(
-                                        text = if (updateState.status == UpdateCheckStatus.UPDATE_AVAILABLE) "更新する" else "更新確認",
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = if (updateState.status == UpdateCheckStatus.UPDATE_AVAILABLE) Color.Black else palette.textColor
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    // Dashboard Data Auto-Refresh Interval Setting
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Text(
-                            text = "■ ダッシュボード情報の自動更新間隔",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = palette.textColor
-                        )
-                        Text(
-                            text = "天気、ニュース、AIノートを自動で再読み込みする頻度を選択します。",
-                            fontSize = 10.sp,
-                            color = palette.secondaryTextColor
-                        )
-                        val intervals = listOf(
-                            15 to "15分ごと",
-                            30 to "30分ごと",
-                            60 to "1時間ごと",
-                            0 to "手動のみ"
-                        )
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            intervals.forEach { (mins, label) ->
-                                val isSelected = updateState.autoRefreshIntervalMinutes == mins
-                                Surface(
-                                    onClick = { onAutoRefreshIntervalChanged(mins) },
-                                    shape = RoundedCornerShape(8.dp),
-                                    color = if (isSelected) palette.accentColor.copy(alpha = 0.25f) else palette.buttonColor,
-                                    border = androidx.compose.foundation.BorderStroke(
-                                        width = if (isSelected) 1.5.dp else 1.dp,
-                                        color = if (isSelected) palette.accentColor else palette.cardBorderColor
-                                    ),
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    Text(
-                                        text = label,
-                                        fontSize = 10.sp,
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                        color = if (isSelected) palette.accentColor else palette.textColor,
-                                        textAlign = TextAlign.Center,
-                                        modifier = Modifier.padding(vertical = 8.dp)
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
+// SettingsDialog is modularized in com.example.ui.SettingsScreen.kt
 
 /**
  * QR Code Dialog: Completely opaque popup background and card.

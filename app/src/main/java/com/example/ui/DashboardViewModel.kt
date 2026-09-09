@@ -114,6 +114,19 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     private val _backgroundThemeIndex = MutableStateFlow(prefs.getInt("background_theme_index", 0))
     val backgroundThemeIndex: StateFlow<Int> = _backgroundThemeIndex.asStateFlow()
 
+    // --- First Launch / Setup Wizard State ---
+    private val _isSetupCompleted = MutableStateFlow(prefs.getBoolean("is_setup_completed", false))
+    val isSetupCompleted: StateFlow<Boolean> = _isSetupCompleted.asStateFlow()
+
+    fun completeSetup() {
+        _isSetupCompleted.value = true
+        prefs.edit().putBoolean("is_setup_completed", true).apply()
+    }
+
+    fun startSetupAgain() {
+        _isSetupCompleted.value = false
+    }
+
     private val _lastUpdatedTime = MutableStateFlow("")
     val lastUpdatedTime: StateFlow<String> = _lastUpdatedTime.asStateFlow()
 
@@ -748,6 +761,47 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
             } catch (ex: Exception) {
                 Toast.makeText(context, "アプリストアを開けませんでした", Toast.LENGTH_SHORT).show()
             }
+        }
+    }
+
+    fun resetAllDataAndSettings() {
+        viewModelScope.launch {
+            // 1. Clear SharedPreferences
+            prefs.edit().clear().apply()
+
+            // 2. Clear Database tasks
+            repository.deleteAll()
+
+            // 3. Reset all in-memory states to defaults
+            val defaultRegion = REGIONS[0]
+            _selectedRegion.value = defaultRegion
+            _backgroundThemeIndex.value = 0
+            _launcherColumns.value = 3
+            _hiddenLauncherPackages.value = emptySet()
+            _launcherFolders.value = emptyList()
+            _alarms.value = emptyList()
+            _isAutoTtsEnabled.value = false
+            _slideshowIntervalSeconds.value = 5
+            _photoScaleMode.value = "fit"
+            _showPhotoClockOverlay.value = true
+            _isPhotoShuffle.value = false
+            _photos.value = emptyList()
+
+            // Re-apply default repository for updates
+            val defaultRepo = "dkym-123a456a7890/Andoroid-dashboard_forOLD"
+            prefs.edit().putString("github_repo_owner_repo", defaultRepo).apply()
+            _updateState.value = AppUpdateState(
+                currentVersion = _updateState.value.currentVersion,
+                latestVersion = _updateState.value.currentVersion,
+                githubRepo = defaultRepo
+            )
+
+            // 4. Return to setup wizard
+            _isSetupCompleted.value = false
+
+            // 5. Fresh chat greeting and data refresh
+            initChatGreeting(defaultRegion)
+            refreshDashboardData()
         }
     }
 
