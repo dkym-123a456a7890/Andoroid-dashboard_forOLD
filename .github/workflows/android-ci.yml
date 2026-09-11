@@ -56,7 +56,7 @@ jobs:
         fi
 
     - name: Build Debug APK
-      run: ./gradlew assembleDebug --stacktrace --no-daemon
+      run: ./gradlew assembleDebug --stacktrace -Dksp.incremental=false -Dkotlin.compiler.execution.strategy=daemon
 
     - name: Upload APK artifact
       uses: actions/upload-artifact@v4
