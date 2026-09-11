@@ -36,11 +36,20 @@ jobs:
 
     - name: Restore debug keystore & environment
       run: |
-        # 1. Restore debug.keystore from base64 if not already present
-        if [ -f "debug.keystore.base64" ] && [ ! -f "debug.keystore" ]; then
-          echo "Restoring debug.keystore from base64..."
+        # 1. Restore debug.keystore from base64 if present, or generate a standard debug keystore
+        if [ -f "debug.keystore.base64" ]; then
+          echo "Restoring debug.keystore from debug.keystore.base64..."
           base64 -d debug.keystore.base64 > debug.keystore
         fi
+
+        # If debug.keystore still doesn't exist, generate one so Gradle signing never fails
+        if [ ! -f "debug.keystore" ]; then
+          echo "debug.keystore not found, generating a fresh debug keystore..."
+          keytool -genkey -v -keystore debug.keystore -alias androiddebugkey -storepass android -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+        fi
+
+        ls -l debug.keystore
+
         # 2. Ensure .env exists to prevent Secrets Gradle Plugin warning/error
         if [ ! -f ".env" ]; then
           touch .env
