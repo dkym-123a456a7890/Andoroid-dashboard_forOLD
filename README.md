@@ -1,3 +1,3 @@
-アップデート機能用のページです
-Google ai studio使ってます
-readmeもaiに書かせようかな
+アップデート機能用のページです<br>
+Google ai studio使ってます<br>
+readmeもaiに書かせようかな<br>
