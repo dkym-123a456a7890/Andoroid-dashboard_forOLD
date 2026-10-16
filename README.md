@@ -1,2 +1,3 @@
 アップデート機能用のページです
-Google ai studioで作りました
+Google ai studio使ってます
+readmeもaiに書かせようかな
