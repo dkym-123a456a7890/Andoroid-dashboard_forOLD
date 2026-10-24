@@ -89,7 +89,9 @@ import coil.request.ImageRequest
 import com.example.data.*
 import com.example.ui.AiContentUiState
 import com.example.ui.AppUpdateDialog
+import com.example.ui.CalculatorView
 import com.example.ui.DashboardViewModel
+import com.example.ui.PhotoFrameView
 import com.example.ui.PhotoItem
 import com.example.ui.QrUtils
 import com.example.ui.REGIONS
@@ -3031,7 +3033,7 @@ fun AppLauncherDrawerContent(
 }
 
 enum class UtilityViewMode {
-    HUB, TIMER, ALARM, AI_CHAT
+    HUB, TIMER, ALARM, AI_CHAT, CALCULATOR, PHOTO_FRAME
 }
 
 @Composable
@@ -3251,15 +3253,18 @@ fun UtilityHubView(
     palette: ThemePalette,
     onOpenAlarm: () -> Unit,
     onOpenTimer: () -> Unit,
-    onOpenAi: () -> Unit
+    onOpenAi: () -> Unit,
+    onOpenCalculator: () -> Unit,
+    onOpenPhotoFrame: () -> Unit
 ) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(top = 18.dp),
+            .padding(top = 10.dp, bottom = 10.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Top
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
+        // Row 1: Alarm, Timer, AI Assistant
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -3279,7 +3284,7 @@ fun UtilityHubView(
             ) {
                 Box(
                     modifier = Modifier
-                        .size(88.dp)
+                        .size(76.dp)
                         .background(
                             brush = Brush.radialGradient(
                                 colors = listOf(Color(0xFFAB47BC), Color(0xFF7B1FA2))
@@ -3289,11 +3294,11 @@ fun UtilityHubView(
                         .border(2.dp, palette.cardBorderColor.copy(alpha = 0.7f), CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
-                    AlarmClockIllustration(modifier = Modifier.size(56.dp))
+                    AlarmClockIllustration(modifier = Modifier.size(50.dp))
                 }
                 Text(
                     text = "アラーム",
-                    fontSize = 13.5.sp,
+                    fontSize = 13.sp,
                     fontWeight = FontWeight.Bold,
                     color = palette.textColor
                 )
@@ -3311,7 +3316,7 @@ fun UtilityHubView(
             ) {
                 Box(
                     modifier = Modifier
-                        .size(88.dp)
+                        .size(76.dp)
                         .background(
                             brush = Brush.radialGradient(
                                 colors = listOf(Color(0xFF26A69A), Color(0xFF00695C))
@@ -3321,11 +3326,11 @@ fun UtilityHubView(
                         .border(2.dp, palette.cardBorderColor.copy(alpha = 0.7f), CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
-                    TimerDialIllustration(modifier = Modifier.size(56.dp))
+                    TimerDialIllustration(modifier = Modifier.size(50.dp))
                 }
                 Text(
                     text = "タイマー",
-                    fontSize = 13.5.sp,
+                    fontSize = 13.sp,
                     fontWeight = FontWeight.Bold,
                     color = palette.textColor
                 )
@@ -3343,7 +3348,7 @@ fun UtilityHubView(
             ) {
                 Box(
                     modifier = Modifier
-                        .size(88.dp)
+                        .size(76.dp)
                         .background(
                             brush = Brush.radialGradient(
                                 colors = listOf(Color(0xFFFFB74D), Color(0xFFE65100))
@@ -3357,12 +3362,95 @@ fun UtilityHubView(
                         imageVector = Icons.Default.AutoAwesome,
                         contentDescription = "AIアシスタント",
                         tint = Color.White,
-                        modifier = Modifier.size(44.dp)
+                        modifier = Modifier.size(38.dp)
                     )
                 }
                 Text(
                     text = "AIアシスタント",
-                    fontSize = 13.5.sp,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = palette.textColor
+                )
+            }
+        }
+
+        // Row 2: Calculator, Photo Frame
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Calculator Feature Circle Button
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    ) { onOpenCalculator() }
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(76.dp)
+                        .background(
+                            brush = Brush.radialGradient(
+                                colors = listOf(Color(0xFF29B6F6), Color(0xFF0288D1))
+                            ),
+                            shape = CircleShape
+                        )
+                        .border(2.dp, palette.cardBorderColor.copy(alpha = 0.7f), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Calculate,
+                        contentDescription = "電卓",
+                        tint = Color.White,
+                        modifier = Modifier.size(38.dp)
+                    )
+                }
+                Text(
+                    text = "電卓",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = palette.textColor
+                )
+            }
+
+            // Photo Frame Feature Circle Button
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    ) { onOpenPhotoFrame() }
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(76.dp)
+                        .background(
+                            brush = Brush.radialGradient(
+                                colors = listOf(Color(0xFFFF7043), Color(0xFFD84315))
+                            ),
+                            shape = CircleShape
+                        )
+                        .border(2.dp, palette.cardBorderColor.copy(alpha = 0.7f), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.PhotoLibrary,
+                        contentDescription = "フォトフレーム",
+                        tint = Color.White,
+                        modifier = Modifier.size(38.dp)
+                    )
+                }
+                Text(
+                    text = "フォトフレーム",
+                    fontSize = 13.sp,
                     fontWeight = FontWeight.Bold,
                     color = palette.textColor
                 )
@@ -3455,6 +3543,8 @@ fun UtilityDrawerContent(
                             UtilityViewMode.TIMER -> "タイマー"
                             UtilityViewMode.ALARM -> "アラーム設定"
                             UtilityViewMode.AI_CHAT -> "AIアシスタント"
+                            UtilityViewMode.CALCULATOR -> "スマート電卓"
+                            UtilityViewMode.PHOTO_FRAME -> "フォトフレーム"
                         },
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Bold,
@@ -3466,6 +3556,8 @@ fun UtilityDrawerContent(
                             UtilityViewMode.TIMER -> if (isTimerRunning) "カウントダウン中" else "時間計測・タイマー"
                             UtilityViewMode.ALARM -> "${alarms.count { it.isEnabled }}件のアラームが有効"
                             UtilityViewMode.AI_CHAT -> "日常の調べ物や質問をサポート"
+                            UtilityViewMode.CALCULATOR -> "10%税込・税抜計算対応＆計算履歴"
+                            UtilityViewMode.PHOTO_FRAME -> "スライドショー・時計表示・写真追加"
                         },
                         fontSize = 11.sp,
                         color = palette.secondaryTextColor
@@ -3504,7 +3596,9 @@ fun UtilityDrawerContent(
                         palette = palette,
                         onOpenAlarm = { viewMode = UtilityViewMode.ALARM },
                         onOpenTimer = { viewMode = UtilityViewMode.TIMER },
-                        onOpenAi = { viewMode = UtilityViewMode.AI_CHAT }
+                        onOpenAi = { viewMode = UtilityViewMode.AI_CHAT },
+                        onOpenCalculator = { viewMode = UtilityViewMode.CALCULATOR },
+                        onOpenPhotoFrame = { viewMode = UtilityViewMode.PHOTO_FRAME }
                     )
                 }
                 UtilityViewMode.TIMER -> {
@@ -3541,6 +3635,12 @@ fun UtilityDrawerContent(
                         onSendMessage = onSendMessage,
                         onClearChat = onClearChat
                     )
+                }
+                UtilityViewMode.CALCULATOR -> {
+                    CalculatorView(palette = palette)
+                }
+                UtilityViewMode.PHOTO_FRAME -> {
+                    PhotoFrameView(palette = palette)
                 }
             }
         }

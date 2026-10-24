@@ -19,6 +19,8 @@ Google AI Studio Build & Jetpack Compose (Material Design 3) で開発されて�
   - 複数タイマー（長押し連続増減対応）
   - 目覚ましアラーム機能
   - Gemini AI を活用したAIノート・アシスタント（便利機能ドロワー内へ統合）
+  - 🧮 **スマート電卓**: 10%税込・税抜計算ショートカット、計算式表示、計算履歴ログ付き
+  - 🖼️ **フォトフレーム**: 美しい日本の風景プリセット（琵琶湖の朝焼け・富士山と桜・秋の紅葉）、端末からの写真追加（Photo Picker対応）、自動スライドショー、スマートディスプレイ時計オーバーレイ
 - **🔄 GitHub Releases 自動アップデート**:
   - GitHub Releases と直接連携し、アプリ内からワンタップで最新版へ自己アップデート
   - 古いAndroid端末でもSSL/TLSエラー（CertPathValidatorException）を起こさないレガシー通信対策済み
