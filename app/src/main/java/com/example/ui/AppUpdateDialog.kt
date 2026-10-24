@@ -47,6 +47,7 @@ fun AppUpdateDialog(
     onOpenGitHubReleases: () -> Unit,
     onSetAutoCheckUpdates: (Boolean) -> Unit,
     onOpenPlayStore: () -> Unit,
+    onOpenBrowserDownload: () -> Unit = onOpenGitHubReleases,
     onDismiss: () -> Unit
 ) {
 
@@ -213,6 +214,7 @@ fun AppUpdateDialog(
                     onStartDownloadAndInstall = onStartDownloadAndInstall,
                     onTriggerInstallApk = onTriggerInstallApk,
                     onOpenGitHubReleases = onOpenGitHubReleases,
+                    onOpenBrowserDownload = onOpenBrowserDownload,
                     onOpenPlayStore = onOpenPlayStore,
                     onDismiss = onDismiss
                 )
@@ -334,6 +336,7 @@ private fun UpdateStatusSection(
     onStartDownloadAndInstall: () -> Unit,
     onTriggerInstallApk: () -> Unit,
     onOpenGitHubReleases: () -> Unit,
+    onOpenBrowserDownload: () -> Unit = onOpenGitHubReleases,
     onOpenPlayStore: () -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -775,6 +778,33 @@ private fun UpdateStatusSection(
                                 fontSize = 11.sp,
                                 color = palette.secondaryTextColor
                             )
+                        }
+
+                        if (updateState.apkDownloadUrl.isNotBlank()) {
+                            Button(
+                                onClick = onOpenBrowserDownload,
+                                colors = ButtonDefaults.buttonColors(containerColor = palette.accentColor),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.OpenInBrowser,
+                                        contentDescription = "Browser Download",
+                                        tint = Color.Black,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Text(
+                                        text = "ブラウザで直接APKをダウンロード",
+                                        fontSize = 11.5.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.Black
+                                    )
+                                }
+                            }
                         }
 
                         Row(

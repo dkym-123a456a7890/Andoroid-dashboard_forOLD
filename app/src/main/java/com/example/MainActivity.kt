@@ -852,6 +852,7 @@ fun DashboardApp() {
             onOpenGitHubReleases = { viewModel.openGitHubReleases(context) },
             onSetAutoCheckUpdates = { viewModel.setAutoCheckUpdates(it) },
             onOpenPlayStore = { viewModel.openPlayStore(context) },
+            onOpenBrowserDownload = { viewModel.openBrowserApkDownload(context) },
             onDismiss = { showUpdateDialog = false }
         )
     }

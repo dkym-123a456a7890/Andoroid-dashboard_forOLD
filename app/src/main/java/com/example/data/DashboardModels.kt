@@ -203,8 +203,8 @@ enum class UpdateCheckStatus {
 }
 
 data class AppUpdateState(
-    val currentVersion: String = "1.0",
-    val latestVersion: String = "1.0",
+    val currentVersion: String = "1.2",
+    val latestVersion: String = "1.2",
     val status: UpdateCheckStatus = UpdateCheckStatus.IDLE,
     val downloadProgress: Float = 0f,
     val downloadSpeedText: String = "",

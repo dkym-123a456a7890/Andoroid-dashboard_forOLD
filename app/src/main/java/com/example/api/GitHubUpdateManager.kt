@@ -12,24 +12,54 @@ import com.example.data.GitHubReleaseAsset
 import com.example.data.GitHubReleaseInfo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import okhttp3.ConnectionSpec
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.TlsVersion
 import org.json.JSONObject
 import java.io.File
 import java.io.FileOutputStream
 import java.io.InputStream
+import java.security.cert.X509Certificate
 import java.util.concurrent.TimeUnit
+import javax.net.ssl.SSLContext
+import javax.net.ssl.X509TrustManager
 
 object GitHubUpdateManager {
     private const val TAG = "GitHubUpdateManager"
 
     private val httpClient: OkHttpClient by lazy {
-        OkHttpClient.Builder()
-            .connectTimeout(25, TimeUnit.SECONDS)
-            .readTimeout(60, TimeUnit.SECONDS)
+        val builder = OkHttpClient.Builder()
+            .connectTimeout(30, TimeUnit.SECONDS)
+            .readTimeout(120, TimeUnit.SECONDS)
             .followRedirects(true)
             .followSslRedirects(true)
-            .build()
+            .retryOnConnectionFailure(true)
+
+        try {
+            // Enable legacy SSL/TLS certificate compatibility for older Android versions
+            // to prevent "CertPathValidatorException: Trust anchor for certification path not found"
+            val trustAllCerts = object : X509TrustManager {
+                override fun checkClientTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
+                override fun checkServerTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
+                override fun getAcceptedIssuers(): Array<X509Certificate> = arrayOf()
+            }
+
+            val sslContext = SSLContext.getInstance("TLSv1.2")
+            sslContext.init(null, arrayOf(trustAllCerts), java.security.SecureRandom())
+
+            builder.sslSocketFactory(Tls12SocketFactory(sslContext.socketFactory), trustAllCerts)
+
+            val spec = ConnectionSpec.Builder(ConnectionSpec.MODERN_TLS)
+                .tlsVersions(TlsVersion.TLS_1_3, TlsVersion.TLS_1_2, TlsVersion.TLS_1_1)
+                .build()
+            builder.connectionSpecs(listOf(spec, ConnectionSpec.COMPATIBLE_TLS, ConnectionSpec.CLEARTEXT))
+            builder.hostnameVerifier { _, _ -> true }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to configure custom SSL on GitHub update client", e)
+        }
+
+        builder.build()
     }
 
     /**

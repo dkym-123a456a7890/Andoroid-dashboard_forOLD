@@ -516,9 +516,9 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
             val installedVer = try {
                 getApplication<Application>().packageManager
                     .getPackageInfo(getApplication<Application>().packageName, 0)
-                    .versionName ?: "1.0"
+                    .versionName ?: "1.2"
             } catch (_: Exception) {
-                "1.0"
+                "1.2"
             }
             val autoCheck = prefs.getBoolean("auto_check_updates", true)
             val autoRefreshMins = prefs.getInt("auto_refresh_interval_minutes", 30)
@@ -751,6 +751,22 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     fun openGitHubReleases(context: Context) {
         val url = _updateState.value.releaseHtmlUrl.ifEmpty {
             "https://github.com/${_updateState.value.githubRepo}/releases"
+        }
+        try {
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            context.startActivity(intent)
+        } catch (e: Exception) {
+            Toast.makeText(context, "ブラウザを開けませんでした: $url", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    fun openBrowserApkDownload(context: Context) {
+        val url = _updateState.value.apkDownloadUrl.ifEmpty {
+            _updateState.value.releaseHtmlUrl.ifEmpty {
+                "https://github.com/${_updateState.value.githubRepo}/releases"
+            }
         }
         try {
             val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {

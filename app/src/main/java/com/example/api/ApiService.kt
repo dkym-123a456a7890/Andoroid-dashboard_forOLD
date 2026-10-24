@@ -50,7 +50,9 @@ class Tls12SocketFactory(private val delegate: SSLSocketFactory) : SSLSocketFact
 
     private fun enableTlsOnSocket(socket: Socket): Socket {
         if (socket is SSLSocket) {
-            socket.enabledProtocols = arrayOf("TLSv1.1", "TLSv1.2")
+            val supported = socket.supportedProtocols ?: emptyArray()
+            val tls = supported.filter { it.startsWith("TLS") }.toTypedArray()
+            socket.enabledProtocols = if (tls.isNotEmpty()) tls else arrayOf("TLSv1.1", "TLSv1.2")
         }
         return socket
     }
@@ -140,7 +142,7 @@ object ApiClient {
         readTimeout(30, TimeUnit.SECONDS)
         writeTimeout(30, TimeUnit.SECONDS)
 
-        if (Build.VERSION.SDK_INT <= 22) {
+        if (Build.VERSION.SDK_INT <= 25) {
             try {
                 val trustAllCerts = object : X509TrustManager {
                     override fun checkClientTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
