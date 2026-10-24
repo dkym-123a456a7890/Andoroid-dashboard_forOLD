@@ -17,10 +17,13 @@ import android.speech.SpeechRecognizer
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import android.widget.Toast
+import android.content.res.Configuration
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
@@ -384,16 +387,43 @@ fun DashboardApp() {
         getThemePalette(backgroundThemeIndex)
     }
 
-    // Left Drawer: App Launcher ONLY
-    val launcherWidth = remember(launcherColumns) {
-        when (launcherColumns) {
-            2 -> 340.dp
-            3 -> 440.dp
-            4 -> 560.dp
-            5 -> 680.dp
-            else -> 780.dp
+    // Auto-detect screen metrics and device form factor on startup (App is fixed to landscape)
+    val configuration = LocalConfiguration.current
+    val screenWidthDp = configuration.screenWidthDp
+    val screenHeightDp = configuration.screenHeightDp
+    val smallestScreenWidthDp = configuration.smallestScreenWidthDp
+    // Device is a compact phone in landscape if height < 520dp or smallestScreenWidth < 600dp
+    val isPhone = smallestScreenWidthDp < 600
+    val isCompactPhoneLandscape = isPhone || screenHeightDp < 520
+
+    // Startup check: auto-tune launcher columns to optimal layout for phone vs tablet
+    LaunchedEffect(isPhone) {
+        if (isPhone && launcherColumns > 4) {
+            viewModel.setLauncherColumns(4)
         }
     }
+
+    // BackHandler: on phone/tablet, handle drawer or utility sheet dismiss
+    BackHandler(enabled = drawerState.isOpen || isUtilitySheetOpen) {
+        if (drawerState.isOpen) {
+            coroutineScope.launch { drawerState.close() }
+        } else if (isUtilitySheetOpen) {
+            isUtilitySheetOpen = false
+        }
+    }
+
+    // Left Drawer: App Launcher width adapted to screen size
+    val maxAllowedLauncherWidth = (screenWidthDp * 0.88f).dp
+    val desiredLauncherWidth = remember(launcherColumns) {
+        when (launcherColumns) {
+            2 -> 300.dp
+            3 -> 380.dp
+            4 -> 480.dp
+            5 -> 600.dp
+            else -> 700.dp
+        }
+    }
+    val launcherWidth = if (desiredLauncherWidth > maxAllowedLauncherWidth) maxAllowedLauncherWidth else desiredLauncherWidth
 
     ModalNavigationDrawer(
         drawerState = drawerState,
@@ -459,11 +489,15 @@ fun DashboardApp() {
                     }
                 }
         ) {
+            // Landscape Multi-Panel Smart Display Layout
+            val panelPadding = if (isCompactPhoneLandscape) 8.dp else 16.dp
+            val panelSpacing = if (isCompactPhoneLandscape) 8.dp else 16.dp
+
             Row(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(16.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    .padding(panelPadding),
+                horizontalArrangement = Arrangement.spacedBy(panelSpacing)
             ) {
                 // Left Panel (30% width) - Digital Clock, Local Weather, Status, Update Time
                 Box(
@@ -487,7 +521,7 @@ fun DashboardApp() {
                     )
                 }
 
-                // Center Panel (40% width) - Dynamic AI Curated Notebook (News, X Trends, Anniversaries, AI Chat)
+                // Center Panel (40% width) - Dynamic Curated Notebook (News, X Trends, Anniversaries)
                 Box(
                     modifier = Modifier
                         .weight(0.4f)
@@ -496,11 +530,7 @@ fun DashboardApp() {
                     CenterCurationPanel(
                         aiContentState = aiContentState,
                         selectedRegion = selectedRegion,
-                        chatMessages = chatMessages,
-                        isChatLoading = isChatLoading,
                         palette = palette,
-                        onSendMessage = { viewModel.sendChatMessage(it) },
-                        onClearChat = { viewModel.clearChat() },
                         onItemClicked = { headline, queryText ->
                             showQrDialogText = headline to queryText
                         }
@@ -523,6 +553,10 @@ fun DashboardApp() {
                 }
             }
 
+            // Floating Edge Pull Handles
+            val edgeHandleHeight = if (isCompactPhoneLandscape) 56.dp else 84.dp
+            val edgeHandleWidth = if (isCompactPhoneLandscape) 28.dp else 36.dp
+
             // Left Edge Pull Hint / Fast Open Tab for App Launcher
             Surface(
                 onClick = {
@@ -534,14 +568,14 @@ fun DashboardApp() {
                 border = androidx.compose.foundation.BorderStroke(1.dp, palette.cardBorderColor),
                 modifier = Modifier
                     .align(Alignment.CenterStart)
-                    .height(84.dp)
-                    .width(36.dp)
+                    .height(edgeHandleHeight)
+                    .width(edgeHandleWidth)
                     .testTag("app_launcher_edge_handle")
             ) {
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(start = 6.dp, end = 2.dp),
+                        .padding(start = 4.dp, end = 2.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center
                 ) {
@@ -549,19 +583,19 @@ fun DashboardApp() {
                         imageVector = Icons.Default.Apps,
                         contentDescription = "アプリ一覧を開く",
                         tint = palette.accentColor,
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(if (isCompactPhoneLandscape) 14.dp else 18.dp)
                     )
-                    Spacer(modifier = Modifier.height(6.dp))
+                    Spacer(modifier = Modifier.height(4.dp))
                     Icon(
                         imageVector = Icons.Default.ChevronRight,
                         contentDescription = "アプリ一覧を開く",
                         tint = palette.textColor,
-                        modifier = Modifier.size(16.dp)
+                        modifier = Modifier.size(if (isCompactPhoneLandscape) 13.dp else 16.dp)
                     )
                 }
             }
 
-            // Right Edge Pull Hint / Fast Open Tab for Utility Menu (Timer & Alarm)
+            // Right Edge Pull Hint / Fast Open Tab for Utility Menu (Timer, Alarm & AI)
             Surface(
                 onClick = {
                     coroutineScope.launch { drawerState.close() }
@@ -572,8 +606,8 @@ fun DashboardApp() {
                 border = androidx.compose.foundation.BorderStroke(1.dp, palette.cardBorderColor),
                 modifier = Modifier
                     .align(Alignment.CenterEnd)
-                    .height(84.dp)
-                    .width(36.dp)
+                    .height(edgeHandleHeight)
+                    .width(edgeHandleWidth)
                     .pointerInput(Unit) {
                         detectHorizontalDragGestures { _, dragAmount ->
                             if (dragAmount < -15f) {
@@ -587,7 +621,7 @@ fun DashboardApp() {
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(start = 2.dp, end = 6.dp),
+                        .padding(start = 2.dp, end = 4.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center
                 ) {
@@ -595,14 +629,14 @@ fun DashboardApp() {
                         imageVector = Icons.Default.Timer,
                         contentDescription = "便利機能メニューを開く",
                         tint = palette.accentColor,
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(if (isCompactPhoneLandscape) 14.dp else 18.dp)
                     )
-                    Spacer(modifier = Modifier.height(6.dp))
+                    Spacer(modifier = Modifier.height(4.dp))
                     Icon(
                         imageVector = Icons.Default.ChevronLeft,
                         contentDescription = "便利機能メニューを開く",
                         tint = palette.textColor,
-                        modifier = Modifier.size(16.dp)
+                        modifier = Modifier.size(if (isCompactPhoneLandscape) 13.dp else 16.dp)
                     )
                 }
             }
@@ -623,7 +657,7 @@ fun DashboardApp() {
                     }
             )
 
-            // Right Swipeable / Slide-over Drawer for Utility Features (Timer & Alarm)
+            // Right Swipeable / Slide-over Drawer for Utility Features (Timer, Alarm & AI)
             AnimatedVisibility(
                 visible = isUtilitySheetOpen,
                 enter = slideInHorizontally(initialOffsetX = { it }) + fadeIn(),
@@ -639,13 +673,14 @@ fun DashboardApp() {
                             indication = null
                         ) { isUtilitySheetOpen = false }
                 ) {
+                    val utilityDrawerWidth = if (isCompactPhoneLandscape) (screenWidthDp * 0.55f).dp.coerceAtLeast(360.dp) else 420.dp
                     Surface(
                         color = palette.containerColor,
                         shape = RoundedCornerShape(topStart = 24.dp, bottomStart = 24.dp, topEnd = 0.dp, bottomEnd = 0.dp),
                         border = androidx.compose.foundation.BorderStroke(1.dp, palette.cardBorderColor),
                         modifier = Modifier
                             .align(Alignment.CenterEnd)
-                            .widthIn(min = 360.dp, max = 480.dp)
+                            .width(utilityDrawerWidth)
                             .fillMaxHeight()
                             .clickable(
                                 interactionSource = remember { MutableInteractionSource() },
@@ -659,6 +694,11 @@ fun DashboardApp() {
                             isTimerFinished = isTimerFinished,
                             alarms = alarms,
                             palette = palette,
+                            chatMessages = chatMessages,
+                            isChatLoading = isChatLoading,
+                            selectedRegion = selectedRegion,
+                            onSendMessage = { viewModel.sendChatMessage(it) },
+                            onClearChat = { viewModel.clearChat() },
                             onStartTimer = { viewModel.startTimer() },
                             onPauseTimer = { viewModel.pauseTimer() },
                             onResetTimer = { viewModel.resetTimer() },
@@ -1247,15 +1287,11 @@ fun WeatherIndicator(label: String, value: String) {
 fun CenterCurationPanel(
     aiContentState: AiContentUiState,
     selectedRegion: RegionConfig,
-    chatMessages: List<ChatMessage>,
-    isChatLoading: Boolean,
     palette: ThemePalette,
-    onSendMessage: (String) -> Unit,
-    onClearChat: () -> Unit,
     onItemClicked: (String, String) -> Unit
 ) {
     var selectedTab by remember { mutableStateOf(0) }
-    val tabs = listOf("ニュース", "Xトレンド", "記念日", "AIチャット")
+    val tabs = listOf("ニュース", "Xトレンド", "記念日")
 
     Card(
         shape = RoundedCornerShape(24.dp),
@@ -1268,7 +1304,7 @@ fun CenterCurationPanel(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(16.dp)
+                .padding(14.dp)
         ) {
             // Tab Row Setup
             TabRow(
@@ -1300,7 +1336,7 @@ fun CenterCurationPanel(
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
             // Body content based on State
             when (aiContentState) {
@@ -1312,7 +1348,7 @@ fun CenterCurationPanel(
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             CircularProgressIndicator(color = palette.accentColor)
                             Spacer(modifier = Modifier.height(8.dp))
-                            Text("AIがダッシュボードを編集中...", fontSize = 12.sp, color = Color.Gray)
+                            Text("最新情報を編集中...", fontSize = 12.sp, color = Color.Gray)
                         }
                     }
                 }
@@ -1331,14 +1367,6 @@ fun CenterCurationPanel(
                                 famousBirthdays = content.famousBirthdays,
                                 palette = palette,
                                 onItemClicked = onItemClicked
-                            )
-                            3 -> NativeAiChatTabContent(
-                                chatMessages = chatMessages,
-                                isLoading = isChatLoading,
-                                selectedRegion = selectedRegion,
-                                palette = palette,
-                                onSendMessage = onSendMessage,
-                                onClearChat = onClearChat
                             )
                         }
                     }
@@ -1372,76 +1400,135 @@ fun NewsTabContent(
         return
     }
 
-    LazyColumn(
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-        modifier = Modifier.fillMaxSize()
-    ) {
-        items(news) { item ->
-            Card(
-                colors = CardDefaults.cardColors(containerColor = palette.itemBackgroundColor),
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .border(1.dp, palette.cardBorderColor, RoundedCornerShape(12.dp))
-                    .clickable {
-                        val searchQuery = "${item.category} ${item.title}"
-                        onItemClicked(item.title, item.url ?: searchQuery)
-                    }
-            ) {
-                Column(
-                    modifier = Modifier.padding(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Surface(
-                            color = when (item.category) {
-                                "テクノロジー", "IT" -> Color(0xFF0288D1)
-                                "スポーツ" -> Color(0xFF2E7D32)
-                                "社会" -> Color(0xFFEF6C00)
-                                "エンタメ" -> Color(0xFFC2185B)
-                                else -> Color(0xFF455A64)
-                            },
-                            shape = RoundedCornerShape(4.dp)
-                        ) {
-                            Text(
-                                text = item.category,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                            )
-                        }
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.QrCode,
-                                contentDescription = "QR Code",
-                                tint = palette.accentColor,
-                                modifier = Modifier.size(14.dp)
-                            )
-                            Text(
-                                text = item.time,
-                                fontSize = 11.sp,
-                                color = palette.secondaryTextColor
-                            )
-                        }
-                    }
+    val listState = rememberLazyListState()
+    var isUserInteracting by remember { mutableStateOf(false) }
 
-                    Text(
-                        text = item.title,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = palette.textColor,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                        lineHeight = 18.sp
-                    )
+    // Automatic smooth scrolling ticker effect (pauses for 4 seconds per headline)
+    LaunchedEffect(news, isUserInteracting) {
+        if (news.size > 1 && !isUserInteracting) {
+            while (true) {
+                delay(3800)
+                val nextIndex = (listState.firstVisibleItemIndex + 1) % news.size
+                listState.animateScrollToItem(nextIndex)
+            }
+        }
+    }
+
+    // Automatically pause auto-scroll when user touches/scrolls manually, resume after 7 seconds
+    LaunchedEffect(listState.isScrollInProgress) {
+        if (listState.isScrollInProgress) {
+            isUserInteracting = true
+            delay(7000)
+            isUserInteracting = false
+        }
+    }
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        // Auto-scroll Status Bar
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 4.dp, vertical = 2.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Surface(
+                    shape = CircleShape,
+                    color = if (isUserInteracting) Color(0xFFFFA000) else Color(0xFF4CAF50),
+                    modifier = Modifier.size(7.dp)
+                ) {}
+                Text(
+                    text = if (isUserInteracting) "手動閲覧中（7秒後に自動スクロール）" else "自動スクロール中",
+                    fontSize = 10.sp,
+                    color = palette.secondaryTextColor
+                )
+            }
+            Text(
+                text = "${news.size}件",
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold,
+                color = palette.accentColor
+            )
+        }
+
+        Spacer(modifier = Modifier.height(4.dp))
+
+        LazyColumn(
+            state = listState,
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.fillMaxSize()
+        ) {
+            items(news) { item ->
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = palette.itemBackgroundColor),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(1.dp, palette.cardBorderColor, RoundedCornerShape(12.dp))
+                        .clickable {
+                            val searchQuery = "${item.category} ${item.title}"
+                            onItemClicked(item.title, item.url ?: searchQuery)
+                        }
+                ) {
+                    Column(
+                        modifier = Modifier.padding(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Surface(
+                                color = when (item.category) {
+                                    "テクノロジー", "IT" -> Color(0xFF0288D1)
+                                    "スポーツ" -> Color(0xFF2E7D32)
+                                    "社会" -> Color(0xFFEF6C00)
+                                    "エンタメ" -> Color(0xFFC2185B)
+                                    else -> Color(0xFF455A64)
+                                },
+                                shape = RoundedCornerShape(4.dp)
+                            ) {
+                                Text(
+                                    text = item.category,
+                                    fontSize = 9.5.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
+                            }
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.QrCode,
+                                    contentDescription = "QR Code",
+                                    tint = palette.accentColor,
+                                    modifier = Modifier.size(13.dp)
+                                )
+                                Text(
+                                    text = item.time,
+                                    fontSize = 10.5.sp,
+                                    color = palette.secondaryTextColor
+                                )
+                            }
+                        }
+
+                        Text(
+                            text = item.title,
+                            fontSize = 12.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = palette.textColor,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            lineHeight = 17.sp
+                        )
+                    }
                 }
             }
         }
@@ -2943,7 +3030,7 @@ fun AppLauncherDrawerContent(
 }
 
 enum class UtilityViewMode {
-    HUB, TIMER, ALARM
+    HUB, TIMER, ALARM, AI_CHAT
 }
 
 @Composable
@@ -3162,26 +3249,27 @@ fun TimerDialIllustration(modifier: Modifier = Modifier) {
 fun UtilityHubView(
     palette: ThemePalette,
     onOpenAlarm: () -> Unit,
-    onOpenTimer: () -> Unit
+    onOpenTimer: () -> Unit,
+    onOpenAi: () -> Unit
 ) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(top = 24.dp),
+            .padding(top = 18.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Top
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp),
+                .padding(horizontal = 10.dp),
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
         ) {
             // Alarm Feature Circle Button
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
@@ -3190,7 +3278,7 @@ fun UtilityHubView(
             ) {
                 Box(
                     modifier = Modifier
-                        .size(112.dp)
+                        .size(88.dp)
                         .background(
                             brush = Brush.radialGradient(
                                 colors = listOf(Color(0xFFAB47BC), Color(0xFF7B1FA2))
@@ -3200,11 +3288,11 @@ fun UtilityHubView(
                         .border(2.dp, palette.cardBorderColor.copy(alpha = 0.7f), CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
-                    AlarmClockIllustration(modifier = Modifier.size(72.dp))
+                    AlarmClockIllustration(modifier = Modifier.size(56.dp))
                 }
                 Text(
                     text = "アラーム",
-                    fontSize = 17.sp,
+                    fontSize = 13.5.sp,
                     fontWeight = FontWeight.Bold,
                     color = palette.textColor
                 )
@@ -3213,7 +3301,7 @@ fun UtilityHubView(
             // Timer Feature Circle Button
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
@@ -3222,21 +3310,58 @@ fun UtilityHubView(
             ) {
                 Box(
                     modifier = Modifier
-                        .size(112.dp)
+                        .size(88.dp)
                         .background(
                             brush = Brush.radialGradient(
-                                colors = listOf(Color(0xFFAB47BC), Color(0xFF7B1FA2))
+                                colors = listOf(Color(0xFF26A69A), Color(0xFF00695C))
                             ),
                             shape = CircleShape
                         )
                         .border(2.dp, palette.cardBorderColor.copy(alpha = 0.7f), CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
-                    TimerDialIllustration(modifier = Modifier.size(72.dp))
+                    TimerDialIllustration(modifier = Modifier.size(56.dp))
                 }
                 Text(
                     text = "タイマー",
-                    fontSize = 17.sp,
+                    fontSize = 13.5.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = palette.textColor
+                )
+            }
+
+            // AI Assistant Feature Circle Button
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    ) { onOpenAi() }
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(88.dp)
+                        .background(
+                            brush = Brush.radialGradient(
+                                colors = listOf(Color(0xFFFFB74D), Color(0xFFE65100))
+                            ),
+                            shape = CircleShape
+                        )
+                        .border(2.dp, palette.cardBorderColor.copy(alpha = 0.7f), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.AutoAwesome,
+                        contentDescription = "AIアシスタント",
+                        tint = Color.White,
+                        modifier = Modifier.size(44.dp)
+                    )
+                }
+                Text(
+                    text = "AIアシスタント",
+                    fontSize = 13.5.sp,
                     fontWeight = FontWeight.Bold,
                     color = palette.textColor
                 )
@@ -3253,6 +3378,11 @@ fun UtilityDrawerContent(
     isTimerFinished: Boolean,
     alarms: List<AlarmItem>,
     palette: ThemePalette,
+    chatMessages: List<ChatMessage>,
+    isChatLoading: Boolean,
+    selectedRegion: RegionConfig,
+    onSendMessage: (String) -> Unit,
+    onClearChat: () -> Unit,
     onStartTimer: () -> Unit,
     onPauseTimer: () -> Unit,
     onResetTimer: () -> Unit,
@@ -3271,13 +3401,13 @@ fun UtilityDrawerContent(
         modifier = Modifier
             .fillMaxSize()
             .background(palette.containerColor)
-            .padding(16.dp)
+            .padding(14.dp)
     ) {
         // Drawer Header with Title and Close / Back Button
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = 12.dp),
+                .padding(bottom = 10.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -3309,7 +3439,7 @@ fun UtilityDrawerContent(
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Timer,
+                            imageVector = Icons.Default.Handyman,
                             contentDescription = "便利機能",
                             tint = Color.White,
                             modifier = Modifier.size(20.dp)
@@ -3320,9 +3450,10 @@ fun UtilityDrawerContent(
                 Column {
                     Text(
                         text = when (viewMode) {
-                            UtilityViewMode.HUB -> "便利機能メニュー"
+                            UtilityViewMode.HUB -> "ツール・便利機能"
                             UtilityViewMode.TIMER -> "タイマー"
                             UtilityViewMode.ALARM -> "アラーム設定"
+                            UtilityViewMode.AI_CHAT -> "AIアシスタント"
                         },
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Bold,
@@ -3330,9 +3461,10 @@ fun UtilityDrawerContent(
                     )
                     Text(
                         text = when (viewMode) {
-                            UtilityViewMode.HUB -> "機能アイコンをタップして起動"
+                            UtilityViewMode.HUB -> "ツールアイコンをタップして起動"
                             UtilityViewMode.TIMER -> if (isTimerRunning) "カウントダウン中" else "時間計測・タイマー"
                             UtilityViewMode.ALARM -> "${alarms.count { it.isEnabled }}件のアラームが有効"
+                            UtilityViewMode.AI_CHAT -> "日常の調べ物や質問をサポート"
                         },
                         fontSize = 11.sp,
                         color = palette.secondaryTextColor
@@ -3357,7 +3489,7 @@ fun UtilityDrawerContent(
 
         HorizontalDivider(color = palette.cardBorderColor, thickness = 1.dp)
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(10.dp))
 
         // Screen Content
         Box(
@@ -3370,7 +3502,8 @@ fun UtilityDrawerContent(
                     UtilityHubView(
                         palette = palette,
                         onOpenAlarm = { viewMode = UtilityViewMode.ALARM },
-                        onOpenTimer = { viewMode = UtilityViewMode.TIMER }
+                        onOpenTimer = { viewMode = UtilityViewMode.TIMER },
+                        onOpenAi = { viewMode = UtilityViewMode.AI_CHAT }
                     )
                 }
                 UtilityViewMode.TIMER -> {
@@ -3396,6 +3529,16 @@ fun UtilityDrawerContent(
                         onAddAlarm = onAddAlarm,
                         onToggleAlarm = onToggleAlarm,
                         onDeleteAlarm = onDeleteAlarm
+                    )
+                }
+                UtilityViewMode.AI_CHAT -> {
+                    NativeAiChatTabContent(
+                        chatMessages = chatMessages,
+                        isLoading = isChatLoading,
+                        selectedRegion = selectedRegion,
+                        palette = palette,
+                        onSendMessage = onSendMessage,
+                        onClearChat = onClearChat
                     )
                 }
             }

@@ -114,6 +114,32 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     private val _backgroundThemeIndex = MutableStateFlow(prefs.getInt("background_theme_index", 0))
     val backgroundThemeIndex: StateFlow<Int> = _backgroundThemeIndex.asStateFlow()
 
+    // --- User Custom Gemini API Key State ---
+    private val _customGeminiApiKey = MutableStateFlow(prefs.getString("user_custom_gemini_api_key", "") ?: "")
+    val customGeminiApiKey: StateFlow<String> = _customGeminiApiKey.asStateFlow()
+
+    fun setCustomGeminiApiKey(key: String) {
+        val trimmed = key.trim()
+        _customGeminiApiKey.value = trimmed
+        prefs.edit().putString("user_custom_gemini_api_key", trimmed).apply()
+        // Re-evaluate API warning and trigger refresh with new key
+        val effectiveKey = getEffectiveGeminiApiKey()
+        _apiKeyWarning.value = effectiveKey.isEmpty()
+        refreshDashboardData()
+    }
+
+    fun getEffectiveGeminiApiKey(): String {
+        val customKey = _customGeminiApiKey.value.trim()
+        if (customKey.isNotEmpty()) {
+            return customKey
+        }
+        val buildKey = BuildConfig.GEMINI_API_KEY.trim()
+        if (buildKey.isNotEmpty() && buildKey != "MY_GEMINI_API_KEY") {
+            return buildKey
+        }
+        return ""
+    }
+
     // --- First Launch / Setup Wizard State ---
     private val _isSetupCompleted = MutableStateFlow(prefs.getBoolean("is_setup_completed", false))
     val isSetupCompleted: StateFlow<Boolean> = _isSetupCompleted.asStateFlow()
@@ -173,11 +199,11 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         _isAiReplying.value = true
 
         viewModelScope.launch {
-            val apiKey = BuildConfig.GEMINI_API_KEY
+            val apiKey = getEffectiveGeminiApiKey()
             val dateStr = _currentDateJp.value
             val timeStr = _currentTime.value
 
-            if (apiKey.isEmpty() || apiKey == "MY_GEMINI_API_KEY") {
+            if (apiKey.isEmpty()) {
                 delay(600)
                 val replyText = generateLocalSmartFallbackReply(trimmed, dateStr)
                 val aiMsg = ChatMessage(text = replyText, isUser = false)
@@ -786,6 +812,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
             _showPhotoClockOverlay.value = true
             _isPhotoShuffle.value = false
             _photos.value = emptyList()
+            _customGeminiApiKey.value = ""
 
             // Re-apply default repository for updates
             val defaultRepo = "dkym-123a456a7890/Andoroid-dashboard_forOLD"
@@ -1693,12 +1720,12 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         val finalAnniversaries = if (anniversaries.isNotEmpty()) anniversaries else getFallbackAnniversaries(month, day).take(5)
         val finalBirthdays = if (birthdays.isNotEmpty()) birthdays else getFamousBirthdaysForDate(month, day).take(3)
 
-        val apiKey = BuildConfig.GEMINI_API_KEY
+        val apiKey = getEffectiveGeminiApiKey()
         var localTips = ""
         var localNewsList: List<NewsItem> = emptyList()
         var isMock = false
 
-        if (apiKey.isEmpty() || apiKey == "MY_GEMINI_API_KEY") {
+        if (apiKey.isEmpty()) {
             _apiKeyWarning.value = true
             val fallbackLocal = getFallbackLocalContent(region)
             localTips = fallbackLocal.first

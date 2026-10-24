@@ -3,6 +3,7 @@ package com.example.ui
 import android.content.Intent
 import android.provider.Settings
 import androidx.compose.animation.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -30,18 +31,24 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.MainActivity
 import com.example.ThemePalette
-import com.example.data.*
-import com.example.getThemePalette
+import com.example.data.AppUpdateState
+import com.example.data.UpdateCheckStatus
 import kotlinx.coroutines.delay
 
 /**
- * Android System Settings-style UI for Smart Dashboard.
- * Groups preferences neatly into Android-like settings categories and cards.
- * Removes redundant preset cities and streamlines postal code lookup.
+ * Material Design 3 (M3) Settings UI for Smart Dashboard.
+ *
+ * Implements genuine Material You / Material 3 styling:
+ * - Expressive rounded containers (RoundedCornerShape 28.dp for Dialogs, 20.dp for Cards)
+ * - Tonal icon badges with soft color containers
+ * - Inset item dividers and generous touch targets (min 56dp)
+ * - M3 standard selection chips, status pills, and radio options
+ * - Fully responsive layout optimized for handhelds and smart displays
  */
 @Composable
 fun SettingsDialog(
@@ -75,133 +82,145 @@ fun SettingsDialog(
         }
     }
 
-    // Modal Scrim / Backdrop
+    // Modal Scrim / Backdrop with smooth darkened scrim
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xDD000000))
+            .background(Color(0xCC000000))
             .clickable(enabled = true, onClick = onDismiss)
             .testTag("settings_screen_backdrop"),
         contentAlignment = Alignment.Center
     ) {
-        // Main Settings Sheet / Card
+        // Material Design 3 Surface Container Dialog Card (shape 28.dp)
         Card(
-            shape = RoundedCornerShape(24.dp),
+            shape = RoundedCornerShape(28.dp),
             colors = CardDefaults.cardColors(containerColor = palette.containerColor),
-            border = androidx.compose.foundation.BorderStroke(1.5.dp, palette.cardBorderColor),
-            elevation = CardDefaults.cardElevation(defaultElevation = 16.dp),
+            border = BorderStroke(1.dp, palette.cardBorderColor.copy(alpha = 0.7f)),
+            elevation = CardDefaults.cardElevation(defaultElevation = 12.dp),
             modifier = Modifier
-                .widthIn(max = 620.dp)
+                .widthIn(max = 640.dp)
                 .fillMaxWidth(0.92f)
-                .fillMaxHeight(0.88f)
+                .fillMaxHeight(0.90f)
                 .clickable(enabled = false) { /* Prevent click through */ }
-                .padding(vertical = 12.dp)
+                .padding(vertical = 8.dp)
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(palette.containerColor)
             ) {
-                // Top App Bar: Android Settings Style Header
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 20.dp, vertical = 16.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                // Top App Bar: Material Design 3 Header
+                Surface(
+                    color = palette.containerColor,
+                    modifier = Modifier.fillMaxWidth()
                 ) {
                     Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 24.dp, vertical = 18.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = palette.accentColor.copy(alpha = 0.2f),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, palette.accentColor.copy(alpha = 0.5f)),
-                            modifier = Modifier.size(42.dp)
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(14.dp)
                         ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    imageVector = Icons.Default.Settings,
-                                    contentDescription = "Settings",
-                                    tint = palette.accentColor,
-                                    modifier = Modifier.size(24.dp)
+                            // M3 Squircle Icon Container
+                            Surface(
+                                shape = RoundedCornerShape(14.dp),
+                                color = palette.accentColor.copy(alpha = 0.16f),
+                                border = BorderStroke(1.dp, palette.accentColor.copy(alpha = 0.4f)),
+                                modifier = Modifier.size(44.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        imageVector = Icons.Default.Settings,
+                                        contentDescription = "Settings",
+                                        tint = palette.accentColor,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                }
+                            }
+
+                            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                Text(
+                                    text = "設定",
+                                    fontSize = 22.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = palette.textColor,
+                                    letterSpacing = 0.2.sp
+                                )
+                                Text(
+                                    text = "端末とディスプレイの環境設定",
+                                    fontSize = 12.sp,
+                                    color = palette.secondaryTextColor
                                 )
                             }
                         }
-                        Column {
-                            Text(
-                                text = "設定",
-                                fontSize = 20.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = palette.textColor
-                            )
-                            Text(
-                                text = "スマートディスプレイの環境設定",
-                                fontSize = 11.5.sp,
-                                color = palette.secondaryTextColor
+
+                        // M3 Close IconButton
+                        IconButton(
+                            onClick = onDismiss,
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(CircleShape)
+                                .background(palette.itemBackgroundColor)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "閉じる",
+                                tint = palette.textColor,
+                                modifier = Modifier.size(20.dp)
                             )
                         }
                     }
-
-                    IconButton(
-                        onClick = onDismiss,
-                        modifier = Modifier
-                            .size(36.dp)
-                            .clip(CircleShape)
-                            .background(palette.itemBackgroundColor)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Close,
-                            contentDescription = "閉じる",
-                            tint = palette.textColor,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
                 }
 
-                HorizontalDivider(color = palette.cardBorderColor.copy(alpha = 0.6f))
+                HorizontalDivider(
+                    color = palette.cardBorderColor.copy(alpha = 0.4f),
+                    thickness = 1.dp
+                )
 
-                // Scrollable Preference Groups
+                // Scrollable Content with M3 Preference Groups
                 Column(
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxWidth()
                         .verticalScroll(rememberScrollState())
-                        .padding(horizontal = 18.dp, vertical = 14.dp),
-                    verticalArrangement = Arrangement.spacedBy(18.dp)
+                        .padding(horizontal = 20.dp, vertical = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(20.dp)
                 ) {
                     // Category 1: Location & Weather
-                    SettingsCategorySection(
+                    M3SettingsCategory(
                         title = "地域と天気",
                         palette = palette
                     ) {
-                        // Region & Address (Postal code search)
-                        SettingsPreferenceItem(
+                        // Region & Address
+                        M3SettingsPreferenceItem(
                             icon = Icons.Default.LocationOn,
-                            iconColor = Color(0xFF42A5F5),
+                            iconContainerColor = Color(0xFF1E88E5),
                             title = "お住まいの地域・住所",
                             summary = "${selectedRegion.name} (${selectedRegion.englishName}) - 郵便番号から自動設定",
                             palette = palette,
                             onClick = { showPostalCodeModal = true },
                             trailingContent = {
                                 Surface(
-                                    shape = RoundedCornerShape(8.dp),
+                                    shape = RoundedCornerShape(100.dp),
                                     color = palette.accentColor.copy(alpha = 0.15f),
-                                    border = androidx.compose.foundation.BorderStroke(1.dp, palette.accentColor)
+                                    border = BorderStroke(1.dp, palette.accentColor.copy(alpha = 0.6f))
                                 ) {
                                     Text(
                                         text = "変更",
-                                        fontSize = 11.sp,
+                                        fontSize = 11.5.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = palette.accentColor,
-                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
                                     )
                                 }
                             }
                         )
 
-                        SettingsItemDivider(palette)
+                        M3ItemDivider(palette)
 
                         // Auto-refresh interval
                         val intervalText = when (updateState.autoRefreshIntervalMinutes) {
@@ -211,28 +230,35 @@ fun SettingsDialog(
                             60 -> "1時間ごと"
                             else -> "${updateState.autoRefreshIntervalMinutes}分ごと"
                         }
-                        SettingsPreferenceItem(
+                        M3SettingsPreferenceItem(
                             icon = Icons.Default.Sync,
-                            iconColor = Color(0xFF26A69A),
+                            iconContainerColor = Color(0xFF00897B),
                             title = "情報の自動更新間隔",
-                            summary = "天気・ニュース・AIノートの更新: $intervalText",
+                            summary = "天気・ニュース・更新情報の更新: $intervalText",
                             palette = palette,
                             onClick = { showIntervalModal = true },
                             trailingContent = {
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                                 ) {
-                                    Text(
-                                        text = intervalText,
-                                        fontSize = 11.sp,
-                                        color = palette.secondaryTextColor
-                                    )
+                                    Surface(
+                                        shape = RoundedCornerShape(100.dp),
+                                        color = palette.itemBackgroundColor,
+                                        border = BorderStroke(1.dp, palette.cardBorderColor)
+                                    ) {
+                                        Text(
+                                            text = intervalText,
+                                            fontSize = 11.5.sp,
+                                            color = palette.textColor,
+                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                                        )
+                                    }
                                     Icon(
                                         imageVector = Icons.AutoMirrored.Filled.ArrowForwardIos,
                                         contentDescription = null,
                                         tint = palette.secondaryTextColor,
-                                        modifier = Modifier.size(12.dp)
+                                        modifier = Modifier.size(13.dp)
                                     )
                                 }
                             }
@@ -240,11 +266,10 @@ fun SettingsDialog(
                     }
 
                     // Category 2: Display & Appearance
-                    SettingsCategorySection(
-                        title = "ディスプレイとテーマ",
+                    M3SettingsCategory(
+                        title = "ディスプレイと外観",
                         palette = palette
                     ) {
-                        // Background Theme
                         val themeName = when (backgroundThemeIndex) {
                             0 -> "アビス (ブルー)"
                             1 -> "エメラルド (グリーン)"
@@ -253,9 +278,9 @@ fun SettingsDialog(
                             4 -> "カーボン (アンバー)"
                             else -> "カスタム"
                         }
-                        SettingsPreferenceItem(
+                        M3SettingsPreferenceItem(
                             icon = Icons.Default.Palette,
-                            iconColor = Color(0xFFAB47BC),
+                            iconContainerColor = Color(0xFF8E24AA),
                             title = "背景テーマカラー",
                             summary = themeName,
                             palette = palette,
@@ -267,47 +292,54 @@ fun SettingsDialog(
                                 ) {
                                     Box(
                                         modifier = Modifier
-                                            .size(18.dp)
+                                            .size(20.dp)
                                             .clip(CircleShape)
                                             .background(palette.accentColor)
-                                            .border(1.5.dp, Color.White.copy(alpha = 0.3f), CircleShape)
+                                            .border(1.5.dp, Color.White.copy(alpha = 0.4f), CircleShape)
                                     )
                                     Icon(
                                         imageVector = Icons.AutoMirrored.Filled.ArrowForwardIos,
                                         contentDescription = null,
                                         tint = palette.secondaryTextColor,
-                                        modifier = Modifier.size(12.dp)
+                                        modifier = Modifier.size(13.dp)
                                     )
                                 }
                             }
                         )
 
-                        SettingsItemDivider(palette)
+                        M3ItemDivider(palette)
 
                         // Launcher Columns
-                        SettingsPreferenceItem(
+                        M3SettingsPreferenceItem(
                             icon = Icons.Default.GridView,
-                            iconColor = Color(0xFFFFA726),
+                            iconContainerColor = Color(0xFFFB8C00),
                             title = "アプリランチャーの列数",
-                            summary = "1行に ${launcherColumns}個 のアプリアイコンを表示",
+                            summary = "1行あたり ${launcherColumns}個 のアプリアイコンを表示",
                             palette = palette,
                             onClick = { showColumnsModal = true },
                             trailingContent = {
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                                 ) {
-                                    Text(
-                                        text = "${launcherColumns}列",
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = palette.textColor
-                                    )
+                                    Surface(
+                                        shape = RoundedCornerShape(100.dp),
+                                        color = palette.itemBackgroundColor,
+                                        border = BorderStroke(1.dp, palette.cardBorderColor)
+                                    ) {
+                                        Text(
+                                            text = "${launcherColumns}列",
+                                            fontSize = 11.5.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = palette.accentColor,
+                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                                        )
+                                    }
                                     Icon(
                                         imageVector = Icons.AutoMirrored.Filled.ArrowForwardIos,
                                         contentDescription = null,
                                         tint = palette.secondaryTextColor,
-                                        modifier = Modifier.size(12.dp)
+                                        modifier = Modifier.size(13.dp)
                                     )
                                 }
                             }
@@ -315,14 +347,14 @@ fun SettingsDialog(
                     }
 
                     // Category 3: System & Home App
-                    SettingsCategorySection(
+                    M3SettingsCategory(
                         title = "システムと動作",
                         palette = palette
                     ) {
                         // Home Launcher Intent
-                        SettingsPreferenceItem(
+                        M3SettingsPreferenceItem(
                             icon = Icons.Default.Home,
-                            iconColor = Color(0xFF66BB6A),
+                            iconContainerColor = Color(0xFF43A047),
                             title = "デフォルトのホームアプリ設定",
                             summary = "本アプリを端末の常時ホーム画面として設定",
                             palette = palette,
@@ -346,36 +378,37 @@ fun SettingsDialog(
                                     imageVector = Icons.Default.OpenInNew,
                                     contentDescription = "開く",
                                     tint = palette.accentColor,
-                                    modifier = Modifier.size(16.dp)
+                                    modifier = Modifier.size(18.dp)
                                 )
                             }
                         )
 
-                        SettingsItemDivider(palette)
+                        M3ItemDivider(palette)
 
                         // Software Update
-                        SettingsPreferenceItem(
+                        val hasUpdate = updateState.status == UpdateCheckStatus.UPDATE_AVAILABLE
+                        M3SettingsPreferenceItem(
                             icon = Icons.Default.SystemUpdate,
-                            iconColor = Color(0xFF29B6F6),
+                            iconContainerColor = Color(0xFF039BE5),
                             title = "ソフトウェア更新",
                             summary = "現在のバージョン: v${updateState.currentVersion}" +
-                                    if (updateState.status == UpdateCheckStatus.UPDATE_AVAILABLE) " (新バージョン v${updateState.latestVersion} あり)" else "",
+                                    if (hasUpdate) " (新バージョン v${updateState.latestVersion} が利用可能)" else "",
                             palette = palette,
                             onClick = onOpenUpdateDialog,
                             trailingContent = {
                                 Button(
                                     onClick = onOpenUpdateDialog,
-                                    shape = RoundedCornerShape(8.dp),
+                                    shape = RoundedCornerShape(100.dp),
                                     colors = ButtonDefaults.buttonColors(
-                                        containerColor = if (updateState.status == UpdateCheckStatus.UPDATE_AVAILABLE) palette.accentColor else palette.buttonColor,
-                                        contentColor = if (updateState.status == UpdateCheckStatus.UPDATE_AVAILABLE) Color.Black else palette.textColor
+                                        containerColor = if (hasUpdate) palette.accentColor else palette.buttonColor,
+                                        contentColor = if (hasUpdate) Color.Black else palette.textColor
                                     ),
-                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                                    modifier = Modifier.height(32.dp)
+                                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
+                                    modifier = Modifier.height(34.dp)
                                 ) {
                                     Text(
-                                        text = if (updateState.status == UpdateCheckStatus.UPDATE_AVAILABLE) "更新する" else "更新確認",
-                                        fontSize = 11.sp,
+                                        text = if (hasUpdate) "更新する" else "確認",
+                                        fontSize = 11.5.sp,
                                         fontWeight = FontWeight.Bold
                                     )
                                 }
@@ -383,15 +416,15 @@ fun SettingsDialog(
                         )
                     }
 
-                    // Category 4: Setup & Factory Reset
-                    SettingsCategorySection(
+                    // Category 4: Setup & Maintenance
+                    M3SettingsCategory(
                         title = "セットアップと初期化",
                         palette = palette
                     ) {
                         // Welcome Setup Wizard
-                        SettingsPreferenceItem(
+                        M3SettingsPreferenceItem(
                             icon = Icons.Default.AutoFixHigh,
-                            iconColor = Color(0xFFFFCA28),
+                            iconContainerColor = Color(0xFFFDD835),
                             title = "ようこそセットアップ画面",
                             summary = "初回起動時の案内とセットアップ手順を再度実行",
                             palette = palette,
@@ -404,34 +437,34 @@ fun SettingsDialog(
                                     imageVector = Icons.AutoMirrored.Filled.ArrowForwardIos,
                                     contentDescription = null,
                                     tint = palette.secondaryTextColor,
-                                    modifier = Modifier.size(12.dp)
+                                    modifier = Modifier.size(13.dp)
                                 )
                             }
                         )
 
-                        SettingsItemDivider(palette)
+                        M3ItemDivider(palette)
 
                         // Factory Reset
-                        SettingsPreferenceItem(
+                        M3SettingsPreferenceItem(
                             icon = Icons.Default.DeleteForever,
-                            iconColor = Color(0xFFEF5350),
+                            iconContainerColor = Color(0xFFE53935),
                             title = "すべてのデータを初期化",
-                            summary = "保存設定・メモ・タスク・写真を消去して工場出荷時の状態へ",
+                            summary = "保存設定・メモ・タスク・写真を消去して工場出荷時の状態へ戻す",
                             palette = palette,
-                            titleColor = Color(0xFFFF6B6B),
+                            titleColor = Color(0xFFFF6E6E),
                             onClick = { showResetConfirmDialog = true },
                             trailingContent = {
                                 Surface(
-                                    shape = RoundedCornerShape(8.dp),
+                                    shape = RoundedCornerShape(100.dp),
                                     color = Color(0xFFD32F2F).copy(alpha = 0.15f),
-                                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFD32F2F))
+                                    border = BorderStroke(1.dp, Color(0xFFEF5350).copy(alpha = 0.6f))
                                 ) {
                                     Text(
                                         text = "リセット",
-                                        fontSize = 11.sp,
+                                        fontSize = 11.5.sp,
                                         fontWeight = FontWeight.Bold,
-                                        color = Color(0xFFFF5252),
-                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                                        color = Color(0xFFFF6E6E),
+                                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
                                     )
                                 }
                             }
@@ -441,7 +474,7 @@ fun SettingsDialog(
             }
         }
 
-        // Sub-Modal 1: Postal Code Search Modal (No preset city grid!)
+        // Sub-Modal 1: Postal Code Search Modal
         if (showPostalCodeModal) {
             PostalCodeSettingModal(
                 selectedRegion = selectedRegion,
@@ -506,30 +539,32 @@ fun SettingsDialog(
 }
 
 /**
- * Android Settings Category Section Header & Group Card
+ * Material Design 3 Category Section Container
  */
 @Composable
-private fun SettingsCategorySection(
+private fun M3SettingsCategory(
     title: String,
     palette: ThemePalette,
     content: @Composable ColumnScope.() -> Unit
 ) {
     Column(
         modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(6.dp)
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         Text(
             text = title,
-            fontSize = 12.sp,
+            fontSize = 12.5.sp,
             fontWeight = FontWeight.Bold,
             color = palette.accentColor,
-            modifier = Modifier.padding(start = 6.dp)
+            letterSpacing = 0.5.sp,
+            modifier = Modifier.padding(start = 8.dp)
         )
 
         Card(
-            shape = RoundedCornerShape(16.dp),
+            shape = RoundedCornerShape(22.dp),
             colors = CardDefaults.cardColors(containerColor = palette.itemBackgroundColor),
-            border = androidx.compose.foundation.BorderStroke(1.dp, palette.cardBorderColor),
+            border = BorderStroke(1.dp, palette.cardBorderColor.copy(alpha = 0.6f)),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(
@@ -541,12 +576,12 @@ private fun SettingsCategorySection(
 }
 
 /**
- * Individual Android Preference Item Row
+ * Material Design 3 Preference Item Row
  */
 @Composable
-private fun SettingsPreferenceItem(
+private fun M3SettingsPreferenceItem(
     icon: ImageVector,
-    iconColor: Color,
+    iconContainerColor: Color,
     title: String,
     summary: String,
     palette: ThemePalette,
@@ -559,57 +594,59 @@ private fun SettingsPreferenceItem(
         color = Color.Transparent,
         modifier = Modifier
             .fillMaxWidth()
-            .defaultMinSize(minHeight = 56.dp)
+            .defaultMinSize(minHeight = 60.dp)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 10.dp),
+                .padding(horizontal = 18.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
                 modifier = Modifier.weight(1f)
             ) {
-                // Android-like colored square icon container
+                // M3 Icon Container
                 Surface(
-                    shape = RoundedCornerShape(10.dp),
-                    color = iconColor.copy(alpha = 0.18f),
-                    modifier = Modifier.size(36.dp)
+                    shape = RoundedCornerShape(12.dp),
+                    color = iconContainerColor.copy(alpha = 0.16f),
+                    modifier = Modifier.size(40.dp)
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Icon(
                             imageVector = icon,
                             contentDescription = null,
-                            tint = iconColor,
-                            modifier = Modifier.size(20.dp)
+                            tint = iconContainerColor,
+                            modifier = Modifier.size(22.dp)
                         )
                     }
                 }
 
                 Column(
-                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                    verticalArrangement = Arrangement.spacedBy(3.dp),
                     modifier = Modifier.weight(1f)
                 ) {
                     Text(
                         text = title,
-                        fontSize = 13.sp,
+                        fontSize = 14.sp,
                         fontWeight = FontWeight.SemiBold,
-                        color = titleColor
+                        color = titleColor,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                     Text(
                         text = summary,
-                        fontSize = 11.sp,
+                        fontSize = 11.5.sp,
                         color = palette.secondaryTextColor,
-                        lineHeight = 15.sp
+                        lineHeight = 16.sp
                     )
                 }
             }
 
             trailingContent?.let {
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(10.dp))
                 it()
             }
         }
@@ -617,15 +654,16 @@ private fun SettingsPreferenceItem(
 }
 
 @Composable
-private fun SettingsItemDivider(palette: ThemePalette) {
+private fun M3ItemDivider(palette: ThemePalette) {
     HorizontalDivider(
-        color = palette.cardBorderColor.copy(alpha = 0.5f),
-        modifier = Modifier.padding(start = 56.dp, end = 16.dp)
+        color = palette.cardBorderColor.copy(alpha = 0.35f),
+        thickness = 0.8.dp,
+        modifier = Modifier.padding(start = 68.dp, end = 18.dp)
     )
 }
 
 /**
- * Postal Code Address Setting Modal
+ * Postal Code Address Setting Modal (Material Design 3)
  */
 @Composable
 private fun PostalCodeSettingModal(
@@ -642,23 +680,26 @@ private fun PostalCodeSettingModal(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xBB000000))
+            .background(Color(0xCC000000))
             .clickable(enabled = true, onClick = onDismiss),
         contentAlignment = Alignment.Center
     ) {
         Card(
-            shape = RoundedCornerShape(20.dp),
+            shape = RoundedCornerShape(28.dp),
             colors = CardDefaults.cardColors(containerColor = palette.containerColor),
-            border = androidx.compose.foundation.BorderStroke(1.5.dp, palette.accentColor),
+            border = BorderStroke(1.5.dp, palette.accentColor.copy(alpha = 0.6f)),
+            elevation = CardDefaults.cardElevation(defaultElevation = 16.dp),
             modifier = Modifier
-                .width(440.dp)
+                .widthIn(max = 480.dp)
+                .fillMaxWidth(0.92f)
                 .padding(16.dp)
                 .clickable(enabled = false) {}
         ) {
             Column(
-                modifier = Modifier.padding(20.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
+                modifier = Modifier.padding(24.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
+                // Header with centered icon
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -666,59 +707,94 @@ private fun PostalCodeSettingModal(
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Surface(
+                            shape = CircleShape,
+                            color = Color(0xFF1E88E5).copy(alpha = 0.16f),
+                            modifier = Modifier.size(38.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Default.LocationOn,
+                                    contentDescription = null,
+                                    tint = Color(0xFF1E88E5),
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+                        Column {
+                            Text(
+                                text = "地域・住所の設定",
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = palette.textColor
+                            )
+                            Text(
+                                text = "郵便番号から地域情報を自動更新",
+                                fontSize = 11.sp,
+                                color = palette.secondaryTextColor
+                            )
+                        }
+                    }
+                    IconButton(
+                        onClick = onDismiss,
+                        modifier = Modifier
+                            .size(32.dp)
+                            .clip(CircleShape)
+                            .background(palette.itemBackgroundColor)
                     ) {
                         Icon(
-                            imageVector = Icons.Default.LocationOn,
+                            Icons.Default.Close,
+                            contentDescription = "閉じる",
+                            tint = palette.textColor,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
+
+                // Current Region Display Card
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = palette.itemBackgroundColor,
+                    border = BorderStroke(1.dp, palette.cardBorderColor.copy(alpha = 0.6f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.NearMe,
                             contentDescription = null,
                             tint = palette.accentColor,
                             modifier = Modifier.size(20.dp)
                         )
-                        Text(
-                            text = "地域・住所の設定",
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = palette.textColor
-                        )
-                    }
-                    IconButton(onClick = onDismiss, modifier = Modifier.size(28.dp)) {
-                        Icon(Icons.Default.Close, contentDescription = "閉じる", tint = palette.secondaryTextColor)
-                    }
-                }
-
-                // Current Region Display
-                Surface(
-                    shape = RoundedCornerShape(10.dp),
-                    color = palette.itemBackgroundColor,
-                    border = androidx.compose.foundation.BorderStroke(1.dp, palette.cardBorderColor),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(
-                        modifier = Modifier.padding(12.dp),
-                        verticalArrangement = Arrangement.spacedBy(2.dp)
-                    ) {
-                        Text(
-                            text = "現在設定されている地域:",
-                            fontSize = 10.5.sp,
-                            color = palette.secondaryTextColor
-                        )
-                        Text(
-                            text = "${selectedRegion.name} (${selectedRegion.englishName})",
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = palette.accentColor
-                        )
-                        Text(
-                            text = "緯度: ${String.format("%.2f", selectedRegion.latitude)}, 経度: ${String.format("%.2f", selectedRegion.longitude)}",
-                            fontSize = 10.sp,
-                            color = palette.secondaryTextColor
-                        )
+                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text(
+                                text = "現在設定中の地域:",
+                                fontSize = 11.sp,
+                                color = palette.secondaryTextColor
+                            )
+                            Text(
+                                text = "${selectedRegion.name} (${selectedRegion.englishName})",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = palette.accentColor
+                            )
+                            Text(
+                                text = "北緯 ${String.format("%.2f", selectedRegion.latitude)}°, 東経 ${String.format("%.2f", selectedRegion.longitude)}°",
+                                fontSize = 10.5.sp,
+                                color = palette.secondaryTextColor
+                            )
+                        }
                     }
                 }
 
                 Text(
-                    text = "郵便番号（7桁・ハイフン任意）を入力して住所を設定します：",
-                    fontSize = 11.sp,
+                    text = "7桁の郵便番号（ハイフン任意）を入力して検索してください：",
+                    fontSize = 11.5.sp,
                     color = palette.secondaryTextColor
                 )
 
@@ -732,6 +808,7 @@ private fun PostalCodeSettingModal(
                         onValueChange = { if (it.length <= 8) postalCodeInput = it },
                         placeholder = { Text("例: 100-0001", fontSize = 12.sp) },
                         singleLine = true,
+                        shape = RoundedCornerShape(14.dp),
                         keyboardOptions = KeyboardOptions(
                             keyboardType = KeyboardType.Number,
                             imeAction = ImeAction.Search
@@ -755,7 +832,7 @@ private fun PostalCodeSettingModal(
                         ),
                         modifier = Modifier
                             .weight(1f)
-                            .height(48.dp)
+                            .height(52.dp)
                     )
 
                     Button(
@@ -775,22 +852,22 @@ private fun PostalCodeSettingModal(
                             containerColor = palette.accentColor,
                             contentColor = Color.Black
                         ),
-                        shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier.height(48.dp)
+                        shape = RoundedCornerShape(14.dp),
+                        modifier = Modifier.height(52.dp)
                     ) {
                         if (isSearching) {
-                            CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Color.Black, strokeWidth = 2.dp)
+                            CircularProgressIndicator(modifier = Modifier.size(18.dp), color = Color.Black, strokeWidth = 2.dp)
                         } else {
-                            Text("検索", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            Text("検索", fontSize = 12.5.sp, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
 
                 statusMessage?.let { (success, msg) ->
                     Surface(
-                        shape = RoundedCornerShape(8.dp),
+                        shape = RoundedCornerShape(12.dp),
                         color = if (success) Color(0xFF2E7D32).copy(alpha = 0.15f) else Color(0xFFC62828).copy(alpha = 0.15f),
-                        border = androidx.compose.foundation.BorderStroke(
+                        border = BorderStroke(
                             1.dp,
                             if (success) Color(0xFF81C784) else Color(0xFFE57373)
                         ),
@@ -798,10 +875,10 @@ private fun PostalCodeSettingModal(
                     ) {
                         Text(
                             text = (if (success) "✓ " else "⚠ ") + msg,
-                            fontSize = 11.5.sp,
+                            fontSize = 12.sp,
                             fontWeight = FontWeight.Medium,
                             color = if (success) Color(0xFF81C784) else Color(0xFFFF8A80),
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)
                         )
                     }
                 }
@@ -810,8 +887,11 @@ private fun PostalCodeSettingModal(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.End
                 ) {
-                    TextButton(onClick = onDismiss) {
-                        Text("閉じる", color = palette.textColor)
+                    TextButton(
+                        onClick = onDismiss,
+                        shape = RoundedCornerShape(100.dp)
+                    ) {
+                        Text("閉じる", color = palette.textColor, fontWeight = FontWeight.SemiBold)
                     }
                 }
             }
@@ -820,7 +900,7 @@ private fun PostalCodeSettingModal(
 }
 
 /**
- * Theme Selector Modal
+ * Material Design 3 Theme Selector Modal
  */
 @Composable
 private fun ThemeSelectorModal(
@@ -840,29 +920,57 @@ private fun ThemeSelectorModal(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xBB000000))
+            .background(Color(0xCC000000))
             .clickable(enabled = true, onClick = onDismiss),
         contentAlignment = Alignment.Center
     ) {
         Card(
-            shape = RoundedCornerShape(20.dp),
+            shape = RoundedCornerShape(28.dp),
             colors = CardDefaults.cardColors(containerColor = palette.containerColor),
-            border = androidx.compose.foundation.BorderStroke(1.5.dp, palette.cardBorderColor),
+            border = BorderStroke(1.5.dp, palette.cardBorderColor.copy(alpha = 0.7f)),
+            elevation = CardDefaults.cardElevation(defaultElevation = 16.dp),
             modifier = Modifier
-                .width(420.dp)
+                .widthIn(max = 440.dp)
+                .fillMaxWidth(0.92f)
                 .padding(16.dp)
                 .clickable(enabled = false) {}
         ) {
             Column(
-                modifier = Modifier.padding(20.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                modifier = Modifier.padding(24.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                Text(
-                    text = "背景テーマカラーの選択",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = palette.textColor
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Surface(
+                        shape = CircleShape,
+                        color = Color(0xFF8E24AA).copy(alpha = 0.16f),
+                        modifier = Modifier.size(38.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Default.Palette,
+                                contentDescription = null,
+                                tint = Color(0xFFAB47BC),
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+                    Column {
+                        Text(
+                            text = "背景テーマの選択",
+                            fontSize = 17.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = palette.textColor
+                        )
+                        Text(
+                            text = "アクセントカラーと壁紙トーンを選択",
+                            fontSize = 11.sp,
+                            color = palette.secondaryTextColor
+                        )
+                    }
+                }
 
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     themes.forEach { (index, data) ->
@@ -871,45 +979,54 @@ private fun ThemeSelectorModal(
 
                         Surface(
                             onClick = { onThemeSelected(index) },
-                            shape = RoundedCornerShape(12.dp),
-                            color = if (isSelected) palette.accentColor.copy(alpha = 0.2f) else palette.itemBackgroundColor,
-                            border = androidx.compose.foundation.BorderStroke(
+                            shape = RoundedCornerShape(16.dp),
+                            color = if (isSelected) palette.accentColor.copy(alpha = 0.18f) else palette.itemBackgroundColor,
+                            border = BorderStroke(
                                 width = if (isSelected) 1.5.dp else 1.dp,
-                                color = if (isSelected) palette.accentColor else palette.cardBorderColor
+                                color = if (isSelected) palette.accentColor else palette.cardBorderColor.copy(alpha = 0.5f)
                             ),
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                                    .padding(horizontal = 16.dp, vertical = 12.dp),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                                 ) {
                                     Box(
                                         modifier = Modifier
-                                            .size(20.dp)
+                                            .size(22.dp)
                                             .clip(CircleShape)
                                             .background(accent)
+                                            .border(1.5.dp, Color.White.copy(alpha = 0.4f), CircleShape)
                                     )
                                     Text(
                                         text = name,
-                                        fontSize = 12.5.sp,
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                        fontSize = 13.sp,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                                         color = if (isSelected) palette.accentColor else palette.textColor
                                     )
                                 }
                                 if (isSelected) {
-                                    Icon(
-                                        imageVector = Icons.Default.Check,
-                                        contentDescription = "Selected",
-                                        tint = palette.accentColor,
-                                        modifier = Modifier.size(16.dp)
-                                    )
+                                    Surface(
+                                        shape = CircleShape,
+                                        color = palette.accentColor,
+                                        modifier = Modifier.size(22.dp)
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Icon(
+                                                imageVector = Icons.Default.Check,
+                                                contentDescription = "Selected",
+                                                tint = Color.Black,
+                                                modifier = Modifier.size(14.dp)
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -920,8 +1037,11 @@ private fun ThemeSelectorModal(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.End
                 ) {
-                    TextButton(onClick = onDismiss) {
-                        Text("閉じる", color = palette.textColor)
+                    TextButton(
+                        onClick = onDismiss,
+                        shape = RoundedCornerShape(100.dp)
+                    ) {
+                        Text("閉じる", color = palette.textColor, fontWeight = FontWeight.SemiBold)
                     }
                 }
             }
@@ -930,7 +1050,7 @@ private fun ThemeSelectorModal(
 }
 
 /**
- * Launcher Columns Modal
+ * Material Design 3 Launcher Columns Modal
  */
 @Composable
 private fun LauncherColumnsModal(
@@ -942,34 +1062,57 @@ private fun LauncherColumnsModal(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xBB000000))
+            .background(Color(0xCC000000))
             .clickable(enabled = true, onClick = onDismiss),
         contentAlignment = Alignment.Center
     ) {
         Card(
-            shape = RoundedCornerShape(20.dp),
+            shape = RoundedCornerShape(28.dp),
             colors = CardDefaults.cardColors(containerColor = palette.containerColor),
-            border = androidx.compose.foundation.BorderStroke(1.5.dp, palette.cardBorderColor),
+            border = BorderStroke(1.5.dp, palette.cardBorderColor.copy(alpha = 0.7f)),
+            elevation = CardDefaults.cardElevation(defaultElevation = 16.dp),
             modifier = Modifier
-                .width(380.dp)
+                .widthIn(max = 420.dp)
+                .fillMaxWidth(0.92f)
                 .padding(16.dp)
                 .clickable(enabled = false) {}
         ) {
             Column(
-                modifier = Modifier.padding(20.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
+                modifier = Modifier.padding(24.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                Text(
-                    text = "アプリランチャーの列数",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = palette.textColor
-                )
-                Text(
-                    text = "アプリ一覧メニューで1行に並べるアイコンの数を選択してください。",
-                    fontSize = 11.sp,
-                    color = palette.secondaryTextColor
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Surface(
+                        shape = CircleShape,
+                        color = Color(0xFFFB8C00).copy(alpha = 0.16f),
+                        modifier = Modifier.size(38.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Default.GridView,
+                                contentDescription = null,
+                                tint = Color(0xFFFB8C00),
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+                    Column {
+                        Text(
+                            text = "アプリランチャーの列数",
+                            fontSize = 17.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = palette.textColor
+                        )
+                        Text(
+                            text = "画面下部に1行で並べるアイコン数",
+                            fontSize = 11.sp,
+                            color = palette.secondaryTextColor
+                        )
+                    }
+                }
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -983,19 +1126,29 @@ private fun LauncherColumnsModal(
                                 containerColor = if (isSelected) palette.accentColor else palette.itemBackgroundColor,
                                 contentColor = if (isSelected) Color.Black else palette.textColor
                             ),
-                            border = androidx.compose.foundation.BorderStroke(
+                            border = BorderStroke(
                                 1.dp,
-                                if (isSelected) palette.accentColor else palette.cardBorderColor
+                                if (isSelected) palette.accentColor else palette.cardBorderColor.copy(alpha = 0.5f)
                             ),
-                            shape = RoundedCornerShape(10.dp),
-                            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp),
+                            shape = RoundedCornerShape(14.dp),
+                            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 12.dp),
                             modifier = Modifier.weight(1f)
                         ) {
-                            Text(
-                                text = "${cols}列",
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold
-                            )
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(2.dp)
+                            ) {
+                                Text(
+                                    text = "$cols",
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = "列",
+                                    fontSize = 10.5.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
                         }
                     }
                 }
@@ -1004,8 +1157,11 @@ private fun LauncherColumnsModal(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.End
                 ) {
-                    TextButton(onClick = onDismiss) {
-                        Text("閉じる", color = palette.textColor)
+                    TextButton(
+                        onClick = onDismiss,
+                        shape = RoundedCornerShape(100.dp)
+                    ) {
+                        Text("閉じる", color = palette.textColor, fontWeight = FontWeight.SemiBold)
                     }
                 }
             }
@@ -1014,7 +1170,7 @@ private fun LauncherColumnsModal(
 }
 
 /**
- * Data Refresh Interval Modal
+ * Material Design 3 Data Refresh Interval Modal
  */
 @Composable
 private fun RefreshIntervalModal(
@@ -1024,38 +1180,66 @@ private fun RefreshIntervalModal(
     onDismiss: () -> Unit
 ) {
     val intervals = listOf(
-        15 to "15分ごと (推奨・リアルタイム寄り)",
+        15 to "15分ごと (推奨・最新情報を保つ)",
         30 to "30分ごと (標準的・省電力)",
-        60 to "1時間ごと (低頻度)",
-        0 to "手動更新のみ (自動では更新しない)"
+        60 to "1時間ごと (低頻度更新)",
+        0 to "手動更新のみ (バックグラウンド取得なし)"
     )
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xBB000000))
+            .background(Color(0xCC000000))
             .clickable(enabled = true, onClick = onDismiss),
         contentAlignment = Alignment.Center
     ) {
         Card(
-            shape = RoundedCornerShape(20.dp),
+            shape = RoundedCornerShape(28.dp),
             colors = CardDefaults.cardColors(containerColor = palette.containerColor),
-            border = androidx.compose.foundation.BorderStroke(1.5.dp, palette.cardBorderColor),
+            border = BorderStroke(1.5.dp, palette.cardBorderColor.copy(alpha = 0.7f)),
+            elevation = CardDefaults.cardElevation(defaultElevation = 16.dp),
             modifier = Modifier
-                .width(420.dp)
+                .widthIn(max = 440.dp)
+                .fillMaxWidth(0.92f)
                 .padding(16.dp)
                 .clickable(enabled = false) {}
         ) {
             Column(
-                modifier = Modifier.padding(20.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                modifier = Modifier.padding(24.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                Text(
-                    text = "情報の自動更新間隔",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = palette.textColor
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Surface(
+                        shape = CircleShape,
+                        color = Color(0xFF00897B).copy(alpha = 0.16f),
+                        modifier = Modifier.size(38.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Default.Sync,
+                                contentDescription = null,
+                                tint = Color(0xFF00897B),
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+                    Column {
+                        Text(
+                            text = "情報の自動更新間隔",
+                            fontSize = 17.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = palette.textColor
+                        )
+                        Text(
+                            text = "天気・ニュースの更新頻度を設定",
+                            fontSize = 11.sp,
+                            color = palette.secondaryTextColor
+                        )
+                    }
+                }
 
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     intervals.forEach { (mins, label) ->
@@ -1063,34 +1247,42 @@ private fun RefreshIntervalModal(
 
                         Surface(
                             onClick = { onIntervalSelected(mins) },
-                            shape = RoundedCornerShape(10.dp),
-                            color = if (isSelected) palette.accentColor.copy(alpha = 0.2f) else palette.itemBackgroundColor,
-                            border = androidx.compose.foundation.BorderStroke(
+                            shape = RoundedCornerShape(16.dp),
+                            color = if (isSelected) palette.accentColor.copy(alpha = 0.18f) else palette.itemBackgroundColor,
+                            border = BorderStroke(
                                 width = if (isSelected) 1.5.dp else 1.dp,
-                                color = if (isSelected) palette.accentColor else palette.cardBorderColor
+                                color = if (isSelected) palette.accentColor else palette.cardBorderColor.copy(alpha = 0.5f)
                             ),
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                                    .padding(horizontal = 16.dp, vertical = 13.dp),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
                                     text = label,
-                                    fontSize = 12.sp,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                    fontSize = 12.5.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                                     color = if (isSelected) palette.accentColor else palette.textColor
                                 )
                                 if (isSelected) {
-                                    Icon(
-                                        imageVector = Icons.Default.Check,
-                                        contentDescription = "Selected",
-                                        tint = palette.accentColor,
-                                        modifier = Modifier.size(16.dp)
-                                    )
+                                    Surface(
+                                        shape = CircleShape,
+                                        color = palette.accentColor,
+                                        modifier = Modifier.size(22.dp)
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Icon(
+                                                imageVector = Icons.Default.Check,
+                                                contentDescription = "Selected",
+                                                tint = Color.Black,
+                                                modifier = Modifier.size(14.dp)
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -1101,8 +1293,11 @@ private fun RefreshIntervalModal(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.End
                 ) {
-                    TextButton(onClick = onDismiss) {
-                        Text("閉じる", color = palette.textColor)
+                    TextButton(
+                        onClick = onDismiss,
+                        shape = RoundedCornerShape(100.dp)
+                    ) {
+                        Text("閉じる", color = palette.textColor, fontWeight = FontWeight.SemiBold)
                     }
                 }
             }
@@ -1111,7 +1306,7 @@ private fun RefreshIntervalModal(
 }
 
 /**
- * Factory Reset Confirm Modal
+ * Material Design 3 Factory Reset Confirmation Dialog
  */
 @Composable
 private fun FactoryResetConfirmModal(
@@ -1127,30 +1322,31 @@ private fun FactoryResetConfirmModal(
         contentAlignment = Alignment.Center
     ) {
         Card(
-            shape = RoundedCornerShape(20.dp),
+            shape = RoundedCornerShape(28.dp),
             colors = CardDefaults.cardColors(containerColor = palette.containerColor),
-            border = androidx.compose.foundation.BorderStroke(2.dp, Color(0xFFFF4444)),
+            border = BorderStroke(2.dp, Color(0xFFE53935)),
             modifier = Modifier
-                .width(420.dp)
+                .widthIn(max = 440.dp)
+                .fillMaxWidth(0.92f)
                 .padding(20.dp)
                 .clickable(enabled = false) {},
             elevation = CardDefaults.cardElevation(defaultElevation = 24.dp)
         ) {
             Column(
-                modifier = Modifier.padding(20.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp),
+                modifier = Modifier.padding(24.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Surface(
                     shape = CircleShape,
-                    color = Color(0xFFFF4444).copy(alpha = 0.2f),
-                    modifier = Modifier.size(54.dp)
+                    color = Color(0xFFE53935).copy(alpha = 0.16f),
+                    modifier = Modifier.size(56.dp)
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Icon(
                             imageVector = Icons.Default.Warning,
                             contentDescription = "Warning",
-                            tint = Color(0xFFFF4444),
+                            tint = Color(0xFFEF5350),
                             modifier = Modifier.size(32.dp)
                         )
                     }
@@ -1158,14 +1354,40 @@ private fun FactoryResetConfirmModal(
 
                 Text(
                     text = "アプリを初期化しますか？",
-                    fontSize = 17.sp,
+                    fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
-                    color = palette.textColor
+                    color = palette.textColor,
+                    textAlign = TextAlign.Center
                 )
 
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = palette.itemBackgroundColor,
+                    border = BorderStroke(1.dp, Color(0xFFE53935).copy(alpha = 0.3f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Text(
+                            text = "以下のデータがすべて完全に消去されます：",
+                            fontSize = 11.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = palette.textColor
+                        )
+                        Text(
+                            text = "• 登録された住所・地域設定\n• 保存されたメモとタスク\n• カスタムフォルダーとフォト設定\n• 各種カスタマイズ",
+                            fontSize = 11.sp,
+                            color = palette.secondaryTextColor,
+                            lineHeight = 16.sp
+                        )
+                    }
+                }
+
                 Text(
-                    text = "すべての保存データ（地域設定、アラーム、メモ、フォルダー分け、フォト設定など）が消去され、初回起動時のようこそセットアップ画面へ戻ります。\n\n※この操作は取り消せません。",
-                    fontSize = 12.sp,
+                    text = "初期化後は初回起動時の「ようこそセットアップ」画面に戻ります。この操作は取り消せません。",
+                    fontSize = 11.5.sp,
                     color = palette.secondaryTextColor,
                     textAlign = TextAlign.Center,
                     lineHeight = 16.sp
@@ -1173,30 +1395,33 @@ private fun FactoryResetConfirmModal(
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     OutlinedButton(
                         onClick = onDismiss,
-                        shape = RoundedCornerShape(10.dp),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, palette.cardBorderColor),
+                        shape = RoundedCornerShape(100.dp),
+                        border = BorderStroke(1.dp, palette.cardBorderColor),
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = palette.textColor),
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(44.dp)
                     ) {
-                        Text(text = "キャンセル", fontSize = 12.sp)
+                        Text(text = "キャンセル", fontSize = 12.5.sp)
                     }
 
                     Button(
                         onClick = onConfirm,
-                        shape = RoundedCornerShape(10.dp),
+                        shape = RoundedCornerShape(100.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFFFF4444),
+                            containerColor = Color(0xFFE53935),
                             contentColor = Color.White
                         ),
                         modifier = Modifier
                             .weight(1f)
+                            .height(44.dp)
                             .testTag("confirm_factory_reset_button")
                     ) {
-                        Text(text = "初期化を実行", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Text(text = "初期化を実行", fontSize = 12.5.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }
