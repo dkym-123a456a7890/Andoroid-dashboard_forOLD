@@ -58,15 +58,3 @@ Google AI Studio Build & Jetpack Compose (Material Design 3) で開発されて�
 
 ### 2. アプリ内からの自動アップデート
 アプリがすでにインストールされている場合は、時計パネル左上の **「更新」** アイコンをタップするだけで、最新版の確認・ダウンロード・インストールが自動で行われます。
-
----
-
-## 🛠️ GitHub Actions による自動ビルド
-
-本リポジトリは GitHub Actions（`.github/workflows/android-ci.yml`）が設定されており、タグ付きリリースを作成すると自動的にAPKがビルドされてReleasesに添付されます。
-
-### 新しいバージョンをリリースする手順：
-1. GitHubの **Releases** ページで **「Draft a new release」** をクリックします。
-2. タグ名に `v1.2`（または次のバージョン番号）を指定します。
-3. タイトルと更新内容を入力し、**「Publish release」** をクリックします。
-4. 数分待つと GitHub Actions が自動でAPKをビルドし、そのリリースページに添付されます。
